@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHAVEA DAY — El Juego</title>
+<style>
+  :root{
+    --bg:#0d0b14; --card:#1a1626; --card2:#241e33; --border:#3a3152;
+    --gold:#f5c542; --red:#e8524a; --green:#5dd39e; --blue:#5aa9e6; --purple:#b088f9;
+    --text:#efeaf7; --muted:#9a8fb8;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:Georgia,'Times New Roman',serif;
+    min-height:100vh; display:flex; justify-content:center;
+    background-image:radial-gradient(ellipse at 50% -20%, #2a1f45 0%, var(--bg) 60%);
+  }
+  #app{width:100%; max-width:760px; padding:16px 14px 60px;}
+  header{text-align:center; padding:18px 0 8px;}
+  h1{
+    font-size:clamp(2rem,7vw,3.2rem); letter-spacing:3px; color:var(--gold);
+    text-shadow:0 0 24px rgba(245,197,66,.35); font-weight:900;
+  }
+  .subtitle{color:var(--muted); font-style:italic; margin-top:4px; font-size:.95rem;}
+  /* HUD */
+  #hud{
+    display:none; position:sticky; top:0; z-index:10;
+    background:rgba(13,11,20,.96); backdrop-filter:blur(6px);
+    border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin:10px 0 14px;
+  }
+  #phasebar{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
+    font-family:Verdana,sans-serif; font-size:.72rem; color:var(--muted); letter-spacing:1px;}
+  #phasename{color:var(--gold); font-weight:bold; text-transform:uppercase;}
+  .stats{display:grid; grid-template-columns:repeat(2,1fr); gap:6px 14px;}
+  @media(min-width:560px){.stats{grid-template-columns:repeat(3,1fr);}}
+  .stat{font-family:Verdana,sans-serif; font-size:.7rem;}
+  .stat .lbl{display:flex; justify-content:space-between; margin-bottom:2px; color:var(--muted);}
+  .bar{height:8px; background:#141020; border-radius:99px; overflow:hidden; border:1px solid #2c2544;}
+  .bar i{display:block; height:100%; border-radius:99px; transition:width .5s ease, background .5s;}
+  /* scene */
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:22px 20px; margin-bottom:14px; animation:pop .35s ease;
+    box-shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  @keyframes pop{from{opacity:0; transform:translateY(12px);} to{opacity:1; transform:none;}}
+  .who{display:flex; align-items:center; gap:10px; margin-bottom:12px;}
+  .who .avatar{font-size:2rem; filter:drop-shadow(0 0 8px rgba(176,136,249,.4));}
+  .who .name{font-family:Verdana,sans-serif; font-size:.8rem; color:var(--purple); letter-spacing:1px; text-transform:uppercase; font-weight:bold;}
+  .scene-text{font-size:1.06rem; line-height:1.65; white-space:pre-line;}
+  .result-text{font-size:1.02rem; line-height:1.6; white-space:pre-line; border-left:3px solid var(--gold); padding-left:14px; margin-top:6px;}
+  .choices{display:flex; flex-direction:column; gap:10px; margin-top:18px;}
+  button.choice, button.next{
+    font-family:Georgia,serif; font-size:1rem; text-align:left;
+    background:var(--card2); color:var(--text); border:1px solid var(--border);
+    border-radius:10px; padding:13px 16px; cursor:pointer; transition:all .15s;
+    line-height:1.4;
+  }
+  button.choice:hover, button.next:hover{border-color:var(--gold); background:#2d2542; transform:translateX(4px);}
+  button.next{text-align:center; border-color:var(--gold); color:var(--gold); font-weight:bold;}
+  .fx{font-family:Verdana,sans-serif; font-size:.72rem; margin-top:12px; color:var(--muted); display:flex; flex-wrap:wrap; gap:8px;}
+  .fx span{background:#141020; border:1px solid var(--border); padding:3px 9px; border-radius:99px;}
+  .fx .up{color:var(--green);} .fx .down{color:var(--red);}
+  .phase-title{
+    text-align:center; padding:26px 10px;
+  }
+  .phase-title .clock{font-family:Verdana,sans-serif; font-size:.8rem; color:var(--muted); letter-spacing:2px;}
+  .phase-title h2{color:var(--gold); font-size:1.7rem; margin:8px 0; letter-spacing:1px;}
+  .phase-title p{color:var(--muted); font-style:italic;}
+  .ending h2{color:var(--gold); font-size:1.5rem; margin-bottom:12px; text-align:center;}
+  .ending .medal{font-size:3.5rem; text-align:center; margin-bottom:10px;}
+  .roll-note{font-family:Verdana,sans-serif; font-size:.72rem; color:var(--blue); margin-top:10px; letter-spacing:.5px;}
+  #intro .roster{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:8px; margin:16px 0;}
+  #intro .r{background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:.85rem; line-height:1.4;}
+  #intro .r b{color:var(--gold);}
+  .small{color:var(--muted); font-size:.8rem; font-style:italic; margin-top:14px;}
+  footer{text-align:center; color:#544a72; font-size:.7rem; font-family:Verdana,sans-serif; margin-top:30px; letter-spacing:1px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🍷 CHAVEA DAY 🍺</h1>
+    <div class="subtitle">Un día al año. Hasta que el cuerpo aguante.</div>
+  </header>
+
+  <div id="hud">
+    <div id="phasebar"><span id="phasename"></span><span id="clock"></span></div>
+    <div class="stats">
+      <div class="stat"><div class="lbl"><span>🍺 Alcohol</span><span id="v-alc"></span></div><div class="bar"><i id="b-alc"></i></div></div>
+      <div class="stat"><div class="lbl"><span>🎩 Dignidad</span><span id="v-dig"></span></div><div class="bar"><i id="b-dig"></i></div></div>
+      <div class="stat"><div class="lbl"><span>⚡ Energía</span><span id="v-ene"></span></div><div class="bar"><i id="b-ene"></i></div></div>
+      <div class="stat"><div class="lbl"><span>💶 Dinero</span><span id="v-din"></span></div><div class="bar"><i id="b-din"></i></div></div>
+      <div class="stat" style="grid-column:1/-1;"><div class="lbl"><span>👑 RESPETO CHAVEA</span><span id="v-resp"></span></div><div class="bar"><i id="b-resp"></i></div></div>
+    </div>
+  </div>
+
+  <div id="stage"></div>
+  <footer>CHAVEA DAY™ · Una vez al año desde tiempos inmemoriales</footer>
+</div>
+
+<script>
+"use strict";
+/* ================= ESTADO ================= */
+const S = { alc:0, dig:100, ene:100, din:140, resp:10 };
+const LIM = { alc:125, dig:100, ene:100, din:250, resp:100 };
+let phaseIdx = 0, queue = [], sceneIdx = 0, log = [], amigo = null;
+/* sustituye la descripción del amigo de Pocho (que nunca tiene nombre) */
+function T(s){ return amigo ? s.replace(/\{AD\}/g, amigo.d) : s; }
+
+const $ = id => document.getElementById(id);
+const rnd = a => a[Math.floor(Math.random()*a.length)];
+function shuffle(a){ a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+
+/* Cuántas veces ha salido cada uno en esta partida. Sirve para que ningún
+   chavea acapare: en cada fase se eligen los que menos han aparecido. */
+let vistos = {};
+function pickFair(pool, n){
+  const elegidas = [];
+  const restantes = shuffle(pool);
+  while(elegidas.length < n && restantes.length){
+    // de los que quedan, el mínimo de apariciones acumuladas
+    let min = Infinity;
+    for(const sc of restantes) min = Math.min(min, vistos[sc.ch]||0);
+    const candidatos = restantes.filter(sc => (vistos[sc.ch]||0) === min);
+    const sc = candidatos[Math.floor(Math.random()*candidatos.length)];
+    restantes.splice(restantes.indexOf(sc), 1);
+    vistos[sc.ch] = (vistos[sc.ch]||0) + 1;
+    elegidas.push(sc);
+  }
+  return shuffle(elegidas);
+}
+
+const CH = {
+  juanjo:{n:"Juanjo «Golosina» Dionisio", a:"🍬"},
+  kike:{n:"Enrique «Kike» Hernández", a:"😈"},
+  salme:{n:"Salme «Perubian» Salmerón", a:"⚓"},
+  guille:{n:"Guille «El Loko»", a:"🔩"},
+  turko:{n:"Carlos «El Turko» Macías", a:"🌿"},
+  fae:{n:"Faé Andrade", a:"🎺"},
+  pocho:{n:"Pocho Rodríguez", a:"🎩"},
+  puente:{n:"Alberto de la Puente", a:"🏃"},
+  hdez:{n:"Alberto Hernández", a:"🤸"},
+  grupo:{n:"Los Chaveas", a:"🍻"},
+  amigo:{n:"El amigo de Pocho", a:"🎭"},
+  tu:{n:"Tú, el aspirante", a:"🫡"}
+};
+
+/* El amigo de Pocho: personaje de novela de ficción, distinto cada partida.
+   Nunca tiene nombre. Nadie se lo pregunta y él nunca lo dice. */
+const AMIGOS = [
+  {d:"Dice que es domador de aves rapaces. Trae un guante de cuero. No trae ave."},
+  {d:"Asegura haber sido campeón nacional de algo que nadie logra que repita dos veces igual."},
+  {d:"Habla como si estuviera levantando acta de todo lo que ocurre. No es notario."},
+  {d:"Dice que tiene un caballo. Insiste MUCHO en el caballo. Nadie ha visto el caballo."},
+  {d:"Lleva gorra de marino. Salme le hace tres preguntas técnicas y falla las tres. Se queda igual."},
+  {d:"Mide dos metros y habla muy bajito. Hay que acercarse tanto que todas sus historias parecen secretos."},
+  {d:"Llega en chándal y con una bolsa de deporte que no abre en toda la noche. Nadie pregunta por la bolsa."}
+];
+
+/* ================= FASES Y EVENTOS ================= */
+const PHASES = [
+/* ---------- FASE 1: LA COMIDA ---------- */
+{
+  name:"LA COMIDA", clock:"14:00 · Restaurante", pick:3,
+  tag:"Todo gran Chavea Day empieza con mantel. Y termina sin él.",
+  intro:{ch:"grupo", text:"Llegas al restaurante. Mesa larga, pan ya abierto.\n\nJuanjo sirviendo vino. Kike de pie junto a la mesa con el móvil en la oreja. El Turko oliendo «rico». Faé decidiendo por todos qué se va a comer.\n\nY Pocho, que te recibe con una palmada en la espalda y te señala una silla concreta:\n\n«Tú aquí, chavea. Hoy es TU día. O lo era. Ahora es el nuestro y tú estás de prueba.»\n\nEl camarero se acerca. Todos piden vino. Te miran. Primera decisión oficial del Chavea Day:",
+    opts:[
+      {t:"«Vino para mí también, por supuesto.»", out:{r:"Asentimiento general. Juanjo te sirve él mismo, hasta arriba, como marcan los cánones. «Así empezamos bien», dice, sin saber que ese mismo vino escribirá su historia esta noche... como siempre.", fx:{resp:+8, alc:+8}}},
+      {t:"«Una cerveza de momento, que hay que dosificar.»", out:{r:"«Dosificar», repite Faé, saboreando la palabra como si fuera un idioma extranjero. Se acepta, pero Salme lo apunta en el registro mental que luego comenta todo.", fx:{resp:+3, alc:+5}}},
+      {t:"«Agua con gas, por favor.»", out:{r:"Se hace un silencio tan denso que se podría cortar con el cuchillo del pan. Kike levanta la vista del móvil por primera vez en el día. Guille suelta una risita inquietante.\n\nPocho, diplomático: «El chavea es de bromas. Trae vino.»", fx:{resp:-10, alc:+6, dig:-5}}}
+    ]},
+  pool:[
+    {ch:"juanjo", text:"Juanjo levanta su copa y te mira fijamente. «Regla número uno del Chavea Day: aquí el vino no se pide, se hereda. Y regla número dos: el que brinda, sigue el ritmo del que más aguanta. Que soy yo.»\n\nEmpieza a rellenarte la copa cada vez que baja del ecuador.",
+      opts:[
+        {t:"Seguirle el ritmo copa a copa", roll:{stat:"alc", dc:80, ok:{r:"Aguantas el pulso enológico con una dignidad que sorprende a la mesa. Juanjo te mira con el respeto de un sumiller a otro. «Este chavea promete», sentencia, sirviendo otra ronda.", fx:{resp:+12, alc:+15}}, ko:{r:"A la cuarta copa el mantel empieza a parecerte una superficie inestable. Confundes el nombre de Kike con el de Guille, que es objetivamente imposible. Juanjo sonríe: «Flojito... pero con ganas. Se valora.»", fx:{resp:+4, alc:+22, dig:-8}}}},
+        {t:"Beber a tu ritmo con elegancia", out:{r:"Sorbos medidos, copa siempre en mano, sin dejarla morir. Técnica de veterano. Nadie te puede acusar de nada. El Turko, que se da cuenta de todo, te guiña un ojo.", fx:{resp:+5, alc:+10}}},
+        {t:"Aguar el vino disimuladamente con gaseosa", out:{r:"Craso error. Pocho es auditor de ciberseguridad: detecta anomalías por profesión y por vocación. «Chavea... ¿eso es GASEOSA?» La mesa entera se gira. Juanjo se lleva la mano al pecho como si le hubieran insultado a la familia.", fx:{resp:-12, dig:-6, alc:+4}}}
+      ]},
+    {ch:"juanjo", text:"Descubres una cosa sobre Juanjo: no habla, SUBTITULA. Cada frase viene con su gesto ilustrativo obligatorio, por evidente que sea la frase.\n\n«Qué sed» → mano en jarra bebiendo del aire.\n«Ese tío conducía fatal» → volante imaginario dando bandazos.\n«Y me lo comí entero» → tenedor fantasma a la boca, mandíbula incluida.\n«Y le colgué el teléfono» → meñique y pulgar en la oreja, por si no quedaba claro qué es un teléfono.\n\nEn el clímax de la anécdota, un revés amplio tira la copa de Kike, que la esquiva con un reflejo tan automático que está claro que lleva veinte años entrenándolo.\n\n«¿Me sigues?», te pregunta Juanjo, con las manos aún en el aire, congeladas a media frase.",
+      opts:[
+        {t:"«Te sigo perfectamente. Sobre todo por los gestos.»", out:{r:"«¿Qué gestos?», pregunta Juanjo... abriendo las dos manos en el gesto universal de «¿qué gestos?». La mesa se viene abajo. Y a los tres segundos vuelve a subir los brazos para explicarte, gesticulando MÁS QUE ANTES, que él no gesticula nada.\n\nKike, sin levantar la vista: «Lleva así desde el colegio. Yo ya me siento en diagonal.»", fx:{resp:+9}}},
+        {t:"Contestarle solo con gestos, sin hablar", out:{r:"Le respondes en su idioma nativo: mímica pura. Le pides una cerveza (jarra al aire), le dices que la historia era larga (mano estirándose al infinito) y le señalas la copa que acaba de tirar (dedo acusador + gesto de derrame).\n\nJuanjo se para en seco... y ACELERA. Duelo de mímica a dos bandas, de pie, sin una sola palabra, mientras la mesa arbitra a gritos. Empate técnico. Faé lo bautiza: «Esgrima chavea.» Nace una tradición.", fx:{resp:+12, ene:-4, dig:-3}}},
+        {t:"Apartar discretamente tu copa de la zona de impacto", out:{r:"Movimiento defensivo de veterano prematuro. Nadie lo comenta, pero el Turko lo ve, sonríe y aparta la suya también. Habéis formado, sin decir palabra, el escudo antimisiles de la mesa. Puntúa poco, pero salva vidas.", fx:{resp:+4}}}
+      ]},
+    {ch:"kike", text:"Suena el móvil de Kike. Otra vez. Se levanta con el «un segundo» número catorce del día y se aleja hablando en voz baja con una mano en el bolsillo.\n\nSalme aprovecha: «Venga, aspirante, prueba clásica: ¿de quién es la llamada? Apuesta un chupito.»",
+      opts:[
+        {t:"«De la novia, obviamente.»", out:{r:"Kike vuelve. Faé, sin filtro: «¿La novia?» Kike: «...era del trabajo.» Nadie le cree. Nunca nadie le cree. Pero técnicamente has perdido la apuesta y pagas el chupito. El misterio de las llamadas de Kike sigue invicto, como debe ser.", fx:{din:-3, alc:+6, resp:+3}}},
+        {t:"«Negocios. Ese hombre tiene NEGOCIOS.»", out:{r:"La mesa asiente con solemnidad. Es la respuesta correcta espiritualmente, aunque sea inverificable. Kike vuelve, se le pregunta, responde «cosas» y se guarda el móvil. «Cosas», repite Guille fascinado. Ganas el chupito por aclamación popular.", fx:{resp:+8, alc:+5}}},
+        {t:"«Es la O.R.A., que sin él el sistema colapsa.»", out:{r:"Carcajada general. Un ingeniero industrial gestionando zonas de aparcamiento regulado es exactamente el tipo de dato que esta mesa jamás olvidará ni perdonará. Kike vuelve y no entiende por qué todos le aplauden. Chupito gratis para ti.", fx:{resp:+9, alc:+5}}}
+      ]},
+    {ch:"salme", text:"Salme lleva diez minutos con el codo en la mesa mirando hacia una mesa donde comen varias amigas. Sin girar la cabeza, te dice: «Aspirante. Análisis táctico. ¿Entro por Instagram o entro en persona? Rápido, que esto es un examen.»",
+      opts:[
+        {t:"«Instagram. Tu terreno, capitán.»", out:{r:"«Correcto», dice, ya con el móvil fuera. En un movimiento que viola varias leyes de la física social, consigue que una de ellas le siga ANTES de acabar el postre. La mesa lo celebra como un gol en el descuento. Tú has sido parte del cuerpo técnico.", fx:{resp:+8}}},
+        {t:"«En persona. Los clásicos nunca fallan.»", out:{r:"Salme niega lentamente, decepcionado. «En persona en la COMIDA no, chavea. En persona se entra de noche. De día se siembra, de noche se recoge. Apunta.» Has fallado el examen, pero la clase magistral valió la pena.", fx:{resp:-3, alc:+4}}},
+        {t:"«¿Y si te presentas como dueño de una escuela náutica?»", out:{r:"Silencio. Salme te mira como si acabaras de inventar el fuego. «...El barco. SIEMPRE el barco. Chavea, eres un peligro.» Guarda la frase para esta noche. Te has ganado su respeto profesional.", fx:{resp:+10}}}
+      ]},
+    {ch:"turko", text:"Entre el segundo plato y el postre, el Turko se levanta con parsimonia de arquitecto. «Voy a ver la fachada del edificio de enfrente. Interesante juego de volúmenes.»\n\nTe mira. Es una invitación. Todos saben qué tipo de «arquitectura» se estudia en esa esquina.",
+      opts:[
+        {t:"Acompañarle a «estudiar la fachada»", out:{r:"La fachada, efectivamente, mejora por momentos. El Turko te explica la diferencia entre un voladizo y una cornisa mientras el mundo se vuelve un 20% más amable. Vuelves a la mesa oliendo rico los dos y con un hambre repentina de postre.\n\nPocho os recibe: «¿Qué tal la fachada?» — «Brutalista», responde el Turko. Nadie pregunta más.", fx:{resp:+8, ene:-8, alc:+2}}},
+        {t:"«Ahora no, que viene el postre.»", out:{r:"El Turko asiente sin juzgar. Es el único del grupo que jamás juzga: él va a su ritmo y respeta el de los demás. Vuelve a los diez minutos oliendo rico, con los ojos a media asta, y pide flan.", fx:{ene:+3}}},
+        {t:"«¿Fachada? Pero si es un bloque de los 80...»", out:{r:"El Turko te pone la mano en el hombro con infinita paciencia. «Chavea. La fachada... es una metáfora.» La mesa entera estalla. Faé llora de risa. Has estado cerca de romper el protocolo más sagrado del grupo.", fx:{resp:-4, dig:-3}}}
+      ]},
+    {ch:"fae", text:"Faé golpea la copa con el cuchillo. Se sube a MEDIA silla (por ahora solo media). «¡Un brindis! Por el aspirante. Que hable él. QUE HABLE. QUE-HA-BLE.»\n\nLa mesa entera corea. El restaurante entero mira.",
+      opts:[
+        {t:"Ponerte de pie y soltar un discurso épico", roll:{stat:"dig", dc:75, ok:{r:"Te arrancas con un discurso sobre la amistad, el vino y los cuerpos que aguantan. Cierras con un «¡Por los chaveas, que el hígado nos pille confesados!» que hace que hasta la mesa de al lado brinde. Faé te abraza. Ha nacido una leyenda.", fx:{resp:+14, alc:+8}}, ko:{r:"Empiezas bien, pero a mitad de discurso se te cruza la sintaxis y terminas diciendo «por el vino de la amistad del cuerpo». Faé lo remata: «¡ESO! ¡Lo que ha dicho!» y todos brindan igual. En este grupo, fracasar con entusiasmo también puntúa.", fx:{resp:+6, dig:-8, alc:+8}}}},
+        {t:"Brindis corto y digno: «Por vosotros, chaveas.»", out:{r:"Sobrio, efectivo, profesional. Pocho asiente con aprobación de auditor: sin riesgos innecesarios. Faé, algo decepcionado por la falta de espectáculo, se encarga él mismo de alargar el brindis cuatro minutos más.", fx:{resp:+5, alc:+5}}},
+        {t:"Hacerte el longuis mirando el móvil", out:{r:"Error de novato. Faé redirige el foco: «¡EL ASPIRANTE PASA DE NOSOTROS!» Ahora todo el restaurante te mira mientras finges responder un correo urgente un sábado a las cuatro de la tarde. Nadie te cree.", fx:{resp:-8, dig:-5}}}
+      ]},
+    {ch:"guille", text:"Te ha tocado al lado de Guille y llevas media comida descubriendo que es, con diferencia, el más tranquilo de la mesa.\n\nMientras Faé grita y Juanjo derrama, Guille come ordenadamente, escucha, hace preguntas concretas y te ha explicado dos cosas técnicas que no sabías. Cero alarmas. Un tío estupendo.\n\nY entonces, mirando su copa, comenta con toda la calma del mundo:\n\n«Yo hoy voy a ir poco a poco, ¿eh? Que si no me pongo tontísimo.»\n\nLa mesa entera se calla un segundo. Y Pocho, sin levantar la vista del plato, murmura: «Ha dicho la frase.»",
+      opts:[
+        {t:"«¿Qué frase? ¿De qué habláis?»", out:{r:"Nadie te contesta directamente. Juanjo hace un gesto con las manos que podría significar «explosión» o «despegue» o las dos cosas. Kike te mira y niega despacio.\n\nEl Turko se apiada de ti: «Todos los años dice que va a ir poco a poco. Y todos los años, chavea, va poco a poco... hasta que ya no.»\n\nGuille, ajeno, te sirve agua muy educadamente. Empiezas a entender de dónde le viene el mote.", fx:{resp:+8}}},
+        {t:"«Poco a poco los dos entonces, Guille.»", out:{r:"Le chocas la copa y pactáis moderación mutua. Guille se ilumina: «¡ESO! ¡Un compañero de moderación!»\n\nLos chaveas os observan como se observa a dos personas firmando un contrato que ambas van a incumplir. Pocho lo resume: «Precioso. Se les ve muy convencidos.» El pacto durará hasta las siete de la tarde y ha quedado registrado ante testigos.", fx:{resp:+10, alc:+6}}},
+        {t:"Aprovechar y rellenarle la copa hasta arriba", out:{r:"Le llenas la copa sonriendo. Guille la mira, te mira, y con toda la lógica de su cerebro de ingeniero concluye: «Bueno, si ya está servida...»\n\nY se la bebe. La mesa entera te localiza como el responsable oficial de haber adelantado el reloj del Loko dos horas. Faé lo celebra. Pocho no. Pocho apunta.\n\nEsta noche, cuando pase lo que pase, todo el mundo va a saber quién empezó.", fx:{resp:+5, alc:+8, dig:-5}}}
+      ]}
+  ]
+},
+/* ---------- FASE 2: LA SOBREMESA ---------- */
+{
+  name:"LA SOBREMESA", clock:"17:30 · Cafés y verdades", pick:3, drift:{alc:+5, ene:-8, din:-20},
+  tag:"La comida terminó hace una hora. Nadie se ha movido. Llegan los cafés y las historias.",
+  intro:{ch:"grupo", text:"Los platos han desaparecido y llega el momento litúrgico que precede a todo: LA RONDA DE CAFÉS. Ley no escrita del Chavea Day: aquí nadie pide la primera copa sin su café antes. El café es la bisagra del día: cierra la comida y abre TODO lo demás.\n\nMientras tanto empieza la hora sagrada de las historias: sale lo de Australia, sale la voltereta, sale —cómo no— la noche de las cortinas. Esto es historia oral. Esto es patrimonio.\n\nEl camarero te mira. ¿Qué pides?",
+    opts:[
+      {t:"Café solo, como los veteranos", out:{r:"«Café solo», asiente Juanjo con aprobación de notario. Protocolo respetado. La cafeína entra a trabajar sabiendo lo que le viene encima: primero el café, LUEGO el gin-tonic. El orden de los factores aquí SÍ altera el producto.", fx:{ene:+10, din:-2, resp:+4}}},
+      {t:"«¿Café? Tráeme ya el primer gin-tonic.»", out:{r:"Silencio. Faé deja la cucharilla en el aire. «Sin... ¿sin café?» Pocho interviene con paciencia de mediocentro: «Chavea, la copa sin café es ansia. La copa DESPUÉS del café es cultura.» Te traen el gin-tonic... y un café de castigo que te tomas bajo supervisión.", fx:{alc:+10, din:-9, resp:-4, ene:+5}}},
+      {t:"Café con Baileys", out:{r:"«Café con Baileys», repites, y la mesa se detiene. Es la tercera vía: técnicamente café, espiritualmente copa, oficialmente postre. Nadie puede acusarte de saltarte el protocolo ni de ir con pies de plomo.\n\n«Este chavea entiende los MATICES», dictamina el Turko. Faé pide otro igual. En diez minutos hay ocho cafés con Baileys en la mesa —los siete chaveas y tú— y el camarero ha tenido que bajar al almacén a por otra botella.", fx:{ene:+6, alc:+6, resp:+7, din:-4}}}
+    ]},
+  pool:[
+    {ch:"grupo", text:"De debajo de la mesa empiezan a salir BOLSAS. Hoy tocaba entrega de regalos y nadie te avisó (o no escuchaste, que a estas alturas ya es posible).\n\nEl repaso histórico es obligatorio antes de abrir nada. El año de la CAMISETA sigue siendo el listón: camiseta de fútbol oficial de los chaveas, con su escudo, y la BANDERA a juego que desde entonces preside cada Chavea Day colgada donde se pueda. Y el año del CANDADO DE BICI, que nadie ha sabido explicar nunca, ni el que lo regaló ni el que lo recibió, y que por eso mismo es sagrado.\n\nSe reparte lo de este año: una petaca grabada para Juanjo, un cenicero de diseño para el Turko, un SILBATO para Faé —error histórico que pagaréis todos esta noche— y unas gafas de sol para Kike «para el barco».\n\nY entonces la mesa entera se gira hacia ti: ¿y el aspirante qué ha traído?",
+      opts:[
+        {t:"Improvisar: regalar tu mechero «con historia»", roll:{stat:"dig", dc:65, ok:{r:"Sacas tu mechero y le inventas sobre la marcha una biografía épica: «Este mechero ha encendido cigarros en tres países y una boda que no debía.» Se lo entregas a Juanjo con solemnidad. La mesa APLAUDE la jugada: no era el regalo, era el CUENTO. Aquí se valora el relato por encima del objeto: por eso el candado de bici es historia y una corbata cara no lo sería jamás.", fx:{resp:+10}}, ko:{r:"Sacas el mechero, empiezas la historia... y te quedas en blanco a mitad. «...y por eso es especial», cierras en falso. Silencio piadoso. Faé lo salva estrenando el silbato. Pocho anota: «Regalo: improvisado. Ejecución: mejorable. Intención: correcta.»", fx:{resp:+3, dig:-5}}}},
+        {t:"Preguntar cómo consigues la camiseta y la bandera", out:{r:"La pregunta correcta en el momento correcto. Se hace un silencio reverencial y Pocho responde con la gravedad de un notario: «La camiseta no se pide, chavea. La camiseta se GANA.» Faé, ya emocionado, empieza a contar el año de la entrega como quien narra una final. Juanjo gesticula el escudo en el aire.\n\nNo has traído regalo, pero acabas de demostrar que entiendes qué es lo que de verdad se regala aquí.", fx:{resp:+11}}},
+        {t:"«El año que viene traigo regalos DOBLES. Palabra.»", out:{r:"«¿Dobles?», repite Kike, interesado. «Que conste en acta», dice Pocho, y lo peor es que CONSTARÁ: este grupo olvida dónde aparcó pero jamás olvida una promesa de regalos. Acabas de hipotecar tu próximo Chavea Day, pero has comprado tiempo con elegancia.", fx:{resp:+5}}},
+        {t:"Escaquearte al baño hasta que pase el temporal", out:{r:"Vuelves a los diez minutos confiando en que la marea haya pasado. Error: la mesa entera te espera EN SILENCIO, con los regalos ya entregados y una silla vacía en el centro. «Te hemos guardado el turno», sonríe Faé. No hay escapatoria en el Chavea Day. Nunca la hubo.", fx:{resp:-7, dig:-4}}}
+      ]},
+    {ch:"juanjo", text:"A mitad de una frase, Juanjo se calla. Sus carrillos se hinchan lentamente, como un pez globo con corbata. Boca cerrada. Mirada al infinito. Saliva operando a máxima capacidad.\n\nEl ácido. Ha llegado el ácido. Los veteranos ni se inmutan. Tú eres nuevo. ¿Qué haces?",
+      opts:[
+        {t:"Seguir la conversación como si nada", out:{r:"Correcto. CORRECTÍSIMO. Continúas hablando de fútbol mirando a Juanjo con normalidad absoluta mientras él gestiona su ecosistema interno. Veinte segundos después: traga, exhala, y retoma la frase EXACTAMENTE donde la dejó.\n\nPocho te susurra: «Has visto al ácido y no has parpadeado. Eso no se enseña.»", fx:{resp:+12}}},
+        {t:"Preguntarle si está bien y ofrecerle agua", out:{r:"Juanjo te fulmina con la mirada sin poder hablar, los carrillos a máxima presión. Kike te aparta con suavidad: «No lo mires. No le hables. Es como los eclipses: se sabe que está pasando, pero no se observa directamente.»", fx:{resp:-5}}},
+        {t:"Apartarte medio metro con disimulo", out:{r:"Comprensible pero cobarde. Juanjo resuelve el episodio con la elegancia de siempre (esta vez traga) y te mira con un puntito de decepción. «El ácido nunca ha salpicado a un inocente», dice muy serio. Guille: «Lo de las cortinas fue vino, técnicamente.»", fx:{resp:-3, dig:-2}}}
+      ]},
+    {ch:"guille", text:"Llevas todo el día hablando con Guille y no entiendes por qué le llaman el Loko. Es el más tranquilo de la mesa: analítico, ordenado, te ha explicado con una servilleta y dos cubiertos por qué el tren de alta velocidad frena antes de lo que parece. Educadísimo. Metódico.\n\nY entonces, entre un gin-tonic y el siguiente, sin transición, SIN AVISO: la servilleta cae, la frase se le desarma a mitad y te agarra del cuello con un cariño que corta la circulación.\n\n«Tú... tú eresh... eshcúchame... TÚ ERESH IMPORTANTE.»\n\nAhí está. El cable. La mesa observa con interés científico: acabas de presenciar la transición en directo.",
+      opts:[
+        {t:"Asentir solemnemente y brindar con él", out:{r:"«¡ESHO!» Guille brinda contigo, te abraza con fuerza de reentrada atmosférica y se calma. Los chaveas asienten: has domado al Loko en su primera fase. «Al Loko no se le contradice, se le acompaña», te explica Salme. «Es como el mar.»", fx:{resp:+10, alc:+7, ene:-4}}},
+        {t:"«¿Qué me quieres decir exactamente, Guille?»", roll:{stat:"ene", dc:70, ok:{r:"Te sumerges en veinte minutos de balbuceo y, contra todo pronóstico, encuentras el hilo: el ingeniero sigue ahí dentro, y te está explicando —a su manera, con la mitad de las consonantes— que la amistad es como una órbita estable: no se sostiene sola, hace falta velocidad. Es... precioso. Se lo dices. Se emociona. La mesa aplaude.", fx:{resp:+12, ene:-10}}, ko:{r:"Intentas descifrarlo pero el mensaje se degrada por momentos. En algún punto Guille pasa del cariño a la fase «¿tú qué me eshtás mirando?» y Pocho tiene que intervenir con un chupito diplomático que reinicia el sistema. Por poco.", fx:{resp:+2, ene:-12, dig:-4}}}},
+        {t:"Zafarte del abrazo con una excusa", out:{r:"Mala idea. Rechazar al Loko en fase cariñosa acelera la transición a fases menos cariñosas. La mesa entera hace «uuuuh» en voz baja. Pocho despliega el protocolo: chupito, cigarro, y a Guille se le olvida. Pero la mesa no olvida que lo provocaste tú.", fx:{resp:-7, dig:-3}}}
+      ]},
+    {ch:"guille", text:"Guille aparece con el paquete de tabaco abierto en abanico y el IQOS en la otra mano, como un crupier ofreciendo cartas. «¿Fumas? Toma. Coge. COGE.» Insiste hasta que aceptas algo.\n\nCuarenta minutos después vuelve, con el paquete vacío y las manos también: «Chavea... ¿te queda alguno?»\n\nEs el ciclo de Guille: da todo lo que tiene y luego lo reclama de vuelta, con la misma inocencia absoluta en ambas direcciones.",
+      opts:[
+        {t:"Devolverle uno de los suyos sin decir nada", out:{r:"Le pasas uno de los que él mismo te dio hace media hora. Guille lo enciende agradecidísimo: «Eresh un tío legal, chavea. LEGAL.» No tiene ni la más remota idea de que es su propio cigarro. Nunca la tiene. Esto ocurre cinco veces por Chavea Day y el sistema funciona por consenso tácito.", fx:{resp:+8, ene:-3}}},
+        {t:"«Guille, este es TUYO. Me lo diste tú.»", out:{r:"Guille frunce el ceño intentando procesar la paradoja temporal. «¿Mío?... ¿Y cómo lo tienes TÚ?» El bucle lógico le ocupa un minuto entero de silencio. Al final decide: «Bueno, pues ahora es tuyo... ¿me lo dash?» Se lo das. Es imposible ganar esta conversación y ahí reside su belleza.", fx:{resp:+6}}},
+        {t:"Comprar un paquete entero y dárselo", out:{r:"Bajas al estanco y vuelves con un paquete completo que le entregas sin ceremonia. Guille lo mira como si le hubieras regalado un planeta. Te abraza durante nueve segundos ininterrumpidos. Al final de la noche, ese paquete habrá circulado por las manos de los siete chaveas y volverá a ti, vacío, con dos cigarros que nadie sabe de dónde han salido.", fx:{resp:+11, din:-6, ene:-4}}}
+      ]},
+    {ch:"pocho", text:"Te levantas para ir al baño y, cuando vuelves, en tu sitio hay una copa nueva. No la has pedido. Nadie te ha preguntado. Está ahí, servida, con hielo justo, esperándote.\n\nMiras a Pocho. Pocho no te mira: está de espaldas hablando con Juanjo, en perfil bajo, como si no tuviera nada que ver con el asunto.\n\nLuego te fijas mejor: hay una copa nueva delante de CADA UNO. Las siete. Nadie ha visto cuándo ha pasado. Esto lleva ocurriendo desde las dos de la tarde y no te habías dado cuenta hasta ahora.",
+      opts:[
+        {t:"Beberla y decirle «gracias, mediocentro»", out:{r:"Pocho se gira, sonríe media sonrisa y no dice nada. Vuelve a lo suyo.\n\nMás tarde, ya con la noche encima, te lo explicará el Turko: «Lleva quince años haciendo eso. Nadie se lo pide. Nadie le paga. Él simplemente hace que la fiesta no se pare nunca. Por eso es el mediocentro.» Haberte dado cuenta ya te pone por delante de mucha gente.", fx:{resp:+10, alc:+8}}},
+        {t:"Ir a la barra y pagar tú la siguiente ronda entera", out:{r:"Te levantas sin avisar, pagas la ronda completa y las traes tú, con el equilibrio precario del aprendiz. Cuando las plantas en la mesa, Pocho levanta la vista y esta vez sí te mira. Un buen rato.\n\n«Vaya», dice. Nada más. Pero es un «vaya» que va a durar años: acabas de hacerle a Pocho lo que Pocho le hace a todo el mundo, y a Pocho no se lo hace nadie.", fx:{resp:+14, din:-25, alc:+7}}},
+        {t:"«Pocho, para, que ya llevo tres.»", out:{r:"«Ya lo sé», dice tranquilamente, sin girarse. «Llevas tres y media. Y esta es la última hasta las copas, porque si te la bebes ahora vas a llegar bien a las once.»\n\nSe gira por fin: «¿Tú te crees que esto lo hago a lo loco?» Y no, no lo hace a lo loco. NUNCA lo hace a lo loco. Ese es el detalle que casi nadie pilla de Pocho.", fx:{resp:+8, alc:+5}}}
+      ]},
+    {ch:"turko", text:"El Turko lleva media hora con el móvil, tecleando. Al principio pensabas que era Instagram. No: son PLANOS. Está respondiendo a un cliente. Un sábado. A las siete de la tarde. En pleno Chavea Day.\n\n«Chavea, tú que estás fresco: si tengo un forjado que tiene que salvar seis metros y el cliente no quiere pilares... ¿tú qué harías?»\n\nLa mesa entera gruñe al unísono: «¡¡TURKOOO!!»",
+      opts:[
+        {t:"Seguirle el rollo y proponer una solución absurda", out:{r:"«Yo pondría un pilar y le diría que es decorativo.» El Turko se queda quieto tres segundos... y luego asiente muy despacio: «...Eso podría funcionar.» Y LO ANOTA. La mesa estalla. Faé: «¡Ha apuntado la chorrada! ¡LA HA APUNTADO!» El lunes, en algún despacho, alguien defenderá tu idea con cara seria.", fx:{resp:+11}}},
+        {t:"Quitarle el móvil y esconderlo", out:{r:"Se lo arrancas de las manos y se lo pasas a Pocho, que lo hace desaparecer en el bolsillo de las trampas. El Turko protesta débilmente («es que el cliente...») y la mesa lo abuchea con cariño: «¡SIEMPRE IGUAL! ¡SIEMPRE HASTA EL ÚLTIMO MOMENTO!» A los diez minutos se le ha olvidado y está más feliz. Le has salvado el día y él lo sabe.", fx:{resp:+12, ene:-3}}},
+        {t:"Ponerte a resolverle el problema en serio", out:{r:"Cometes el error de INTERESARTE. Veinte minutos después estáis los dos con servilletas dibujando vigas mientras el resto del grupo os mira con auténtica pena. Juanjo, gesticulando: «Hemos perdido a dos.» Aprendes que en el Chavea Day el curro se aparca, se ridiculiza y se olvida. En ese orden.", fx:{resp:-5, ene:-6}}}
+      ]},
+    {ch:"salme", text:"Salme lleva veinte minutos con el móvil en horizontal, enseñándole la pantalla a Kike, y de pronto se gira hacia ti y te lo planta delante sin avisar.\n\nEs el Instagram de la escuela náutica. Un vídeo de un velero al atardecer, música épica, texto encima: «TU PRÓXIMA AVENTURA EMPIEZA AQUÍ.»\n\n«Chavea. Opinión sincera. ¿Funciona o no funciona?»\n\nLa mesa entera espera. Es un examen y no sabes de qué asignatura.",
+      opts:[
+        {t:"«Funciona. Pero cámbiale la música.»", out:{r:"Salme se queda quieto. Vuelve a poner el vídeo. Lo ve otra vez. «...La música.» Pausa larga. «LA MÚSICA.»\n\nSe pasa el resto de la sobremesa buscando canciones y a las ocho de la tarde el vídeo está republicado con música nueva. A la semana tendrá el triple de visitas y él te lo recordará durante años. Has entrado en el consejo asesor de la escuela náutica sin cobrar nada.", fx:{resp:+11}}},
+        {t:"«Aquí lo que vende eres tú, no el barco.»", out:{r:"Silencio en la mesa. Y entonces Faé estalla: «¡LO HA DICHO! ¡LLEVAMOS DIEZ AÑOS DICIÉNDOSELO!»\n\nSalme finge indignación pero está claramente encantado. «Yo salgo poco porque soy discreto.» Carcajada general: el hombre más discreto del Instagram. Buen ojo, chavea: has tocado exactamente el nervio del grupo.", fx:{resp:+10, alc:+5}}},
+        {t:"«Yo de barcos no entiendo nada, Salme.»", out:{r:"«No te he preguntado de barcos», responde con paciencia. «Te he preguntado de INSTAGRAM.» Y ahí está el error: creías que el negocio de Salme eran los barcos.\n\nEl negocio de Salme nunca han sido los barcos. Guarda el móvil algo decepcionado y le pregunta al Turko, que le da tres ideas buenas sin apenas levantar la vista.", fx:{resp:-4}}}
+      ]},
+    {ch:"fae", text:"La sobremesa lleva dos horas y Faé no ha estado sentado ni veinte minutos seguidos. Ha cambiado de silla cuatro veces, ha hablado con la mesa de al lado, ha ido a la barra a hacerse amigo del camarero y ahora está de pie detrás de ti con las dos manos en el respaldo de tu silla.\n\n«Chavea. Chavea. Estoy pensando una cosa.»\n\nCuando Faé está pensando una cosa, la mesa entera se prepara. Nunca es una cosa pequeña.",
+      opts:[
+        {t:"«Dime. Te escucho.»", out:{r:"La cosa es esta: quiere organizar un CAMPEONATO. De qué, no lo tiene claro todavía. Pero hay premio (una servilleta firmada), hay bases (que va inventando mientras habla) y hay comisario (tú).\n\nMedia hora después hay un campeonato de tirar tapones a un vaso con ocho participantes, clasificación escrita en el mantel y una polémica arbitral que llegará hasta los churros del amanecer. Y el organizador oficial figuras tú.", fx:{resp:+11, ene:-5}}},
+        {t:"«Faé, tío, siéntate y descansa un rato.»", out:{r:"Le pones la mano en el hombro y le señalas la silla. Faé se sienta. Dura ocho segundos.\n\nA los ocho segundos está de pie otra vez, esta vez explicándole su idea a Guille, que la mejora, que es lo peor que le puede pasar a una idea de Faé. Lo has intentado. Nadie ha conseguido nunca sentar a este hombre.", fx:{resp:+3, ene:+5}}},
+        {t:"Adelantarte y proponer tú la idea del día", out:{r:"Le robas el turno: propones tú un campeonato de brindis por parejas. Faé se queda a media frase, procesando el atrevimiento... y luego te agarra la cara con las dos manos:\n\n«¡ESTE CHAVEA PIENSA COMO YO!»\n\nEs peligrosísimo que Faé encuentre un cómplice, y acabas de ofrecerte voluntario. El resto del día lo pagaréis todos. Puntúa muchísimo.", fx:{resp:+13, alc:+7, dig:-4}}}
+      ]},
+    {ch:"pocho", text:"Pocho da dos palmadas. Del bolsillo interior de la chaqueta —un bolsillo que parece contener más de lo que la física permite— saca la señal universal: «RONDA DE CHUPITOS. Aquí no se libra ni el aspirante. ESPECIALMENTE el aspirante.»",
+      opts:[
+        {t:"«Venga, el mío doble, que soy nuevo.»", out:{r:"La frase correcta en el momento correcto. La mesa ruge. Pocho te sirve el doble con el orgullo de un padre. «¿Habéis visto? ESO es actitud de chavea.» Tu hígado presenta su dimisión, que es rechazada.", fx:{resp:+13, alc:+16}}},
+        {t:"Tomarte el reglamentario sin protestar", out:{r:"Cumples. El chupito baja, la maquinaria sigue. Pocho asiente: no todos los goles son de chilena, algunos son de penalti bien tirado.", fx:{resp:+5, alc:+9}}},
+        {t:"Pasarle tu chupito a Guille disimuladamente", roll:{stat:"dig", dc:80, ok:{r:"Maniobra de alto riesgo ejecutada con éxito: Guille se encuentra dos chupitos y los interpreta como un regalo del cosmos. Se los bebe encantado. Nadie más lo ha visto... aunque acabas de acelerar el cruce de cable del Loko. Que las consecuencias te pillen lejos.", fx:{resp:+3}}, ko:{r:"«Chavea.» Es todo lo que dice Pocho. Una palabra, como un asiento contable: fecha, hora, infracción. Te sirve otro. La mesa observa en silencio ceremonial cómo pagas tu deuda. Con intereses.", fx:{resp:-6, alc:+14}}}}
+      ]},
+    {ch:"kike", text:"Kike ha cometido el error táctico del día: dos copas seguidas al ritmo de la mesa. El resultado es inmediato y conocido: sonríe mucho, habla poco y lo poco que dice no compila. Se levanta hacia el baño trazando un zigzag perfecto entre las mesas, como si esquivara boyas invisibles.",
+      opts:[
+        {t:"Escoltarlo discretamente hasta el baño", out:{r:"Caminas a su lado sin tocarle, como un remolcador de puerto. Kike llega, vuelve, y en su idioma actual de sonrisas y monosílabos te dice algo que interpretas como gratitud eterna. Suena su móvil. Lo coge. Y de pronto habla PERFECTAMENTE. La mesa lleva años estudiando este fenómeno sin éxito.", fx:{resp:+9, ene:-3}}},
+        {t:"Narrar el zigzag en directo como comentarista", out:{r:"«Sale del área, deja atrás la primera mesa, recorte a la izquierda, LA SILLA, esquiva la silla, señoras y señores, ESTO ES CONDUCCIÓN...» La mesa llora. Salme lo graba. Kike, al volver, pide que le enseñen el vídeo y es el que más se ríe, aunque no del todo seguro de qué.", fx:{resp:+11, dig:-2}}},
+        {t:"Apostar 5€ con Faé a que no llega recto", out:{r:"Pierde todo el mundo: Kike no llega recto (pierdes tú, que apostaste a fe ciega el «llega»... error de novato: nadie apuesta a que Kike llega recto). Faé recoge tus 5€ con una reverencia. Lección cara pero justa.", fx:{din:-5, resp:+3, alc:+4}}}
+      ]},
+    {ch:"grupo", text:"Sale LA historia: el día que Juanjo, en plena naturaleza, intentó alcanzar una naranja de un naranjo, calculó mal el salto, cayó como un saco de patatas y se hizo un esguince. Volvió a la civilización usando a Pocho de bastón humano durante kilómetros.\n\nFaé, con un brillo peligroso en los ojos: «Aspirante. Reproduce el salto. Hay una lámpara ahí que hace de naranja perfectamente.»",
+      opts:[
+        {t:"Reproducir el salto histórico", roll:{stat:"ene", dc:75, ok:{r:"Coges carrerilla entre las mesas, saltas, rozas la lámpara con la punta de los dedos y aterrizas LIMPIO. El restaurante entero aplaude. Juanjo se levanta y te da un abrazo emocionado: «Lo que yo no pude... lo has hecho tú.» Hay lágrimas. Posiblemente de la ginebra, pero hay lágrimas.", fx:{resp:+14, ene:-8}}, ko:{r:"Coges carrerilla, saltas... y aterrizas EXACTAMENTE como Juanjo en su día: mal. El tobillo protesta. La mesa se divide entre la carcajada y el homenaje: «¡IGUAL! ¡Lo ha hecho IGUAL!» Pocho suspira y te ofrece el hombro: «Vamos, bastón dos, la secuela.»", fx:{resp:+8, ene:-18, dig:-6}}}},
+        {t:"Narrar el salto con reconstrucción teatral (sin saltar)", out:{r:"Te levantas y recreas el momento a cámara lenta: la mirada a la naranja, la ambición, el error de cálculo, la caída, el grito. Tu interpretación de «Pocho convertido en bastón» arranca la ovación de la tarde. Juanjo aplaude: «Así fue. Exactamente así de ridículo.»", fx:{resp:+9, dig:+2}}},
+        {t:"«Yo por una naranja no salto.»", out:{r:"«Nadie salta POR LA NARANJA, chavea», explica Juanjo con gravedad filosófica. «Se salta por saltar. La naranja es lo de menos.» Toda la mesa asiente como si fuera Séneca. Has perdido una oportunidad de oro de entender el espíritu del grupo.", fx:{resp:-5}}}
+      ]},
+    {ch:"juanjo", text:"Juanjo se pone nostálgico con el gin-tonic: «¿Sabéis? Cuando dejé lo de tesorero y me fui el año a Australia a encontrarme a mí mismo...»\n\nFaé, automático: «¿Y te encontraste?» — Juanjo: «Encontré cosas.» \n\nSe gira hacia ti: «¿Tú qué opinas, aspirante? ¿Uno puede encontrarse a sí mismo?»",
+      opts:[
+        {t:"«Uno no se encuentra: se construye. Como este día.»", out:{r:"Silencio reverencial. Juanjo se queda mirándote, asiente lento y alza la copa: «El chavea filósofo.» El Turko, desde su nube: «Profundo.» Has conectado con el lado espiritual del grupo, que existe y aflora exactamente entre el tercer y cuarto gin-tonic.", fx:{resp:+10, alc:+5}}},
+        {t:"«¿Y no era más fácil encontrarse en Huelva?»", out:{r:"Carcajada general. Juanjo intenta defenderse: «En Australia hay... perspectiva.» — «Y canguros», apunta Guille. — «Y 20.000 kilómetros de distancia de la tesorería», remata Kike, EL COMENTARIO del día. Juanjo encaja con deportividad. Tu pregunta lo desencadenó: puntúa.", fx:{resp:+7}}},
+        {t:"Bostezar en mitad de la historia", out:{r:"El bostezo es interceptado en directo. «¿Le ABURRE Australia al aspirante?», pregunta Faé al público. Sentencia de Salme, sin levantar la vista del Instagram: «Al año que viene no llega.» Toca remontada.", fx:{resp:-8, ene:+4}}}
+      ]}
+  ]
+},
+/* ---------- FASE 3: LAS COPAS ---------- */
+{
+  name:"LAS COPAS", clock:"21:30 · Ruta de bares", pick:3, drift:{alc:+8, ene:-10, din:-15},
+  tag:"Green Daila, La Casona, La Loca. El radar de Kike marca el rumbo.",
+  intro:{ch:"grupo", text:"Cambio de escenario: bares. Y aquí el mando es de UNO. Kike guarda el móvil (llamada 31 del día, rechazada: esto es más importante) y activa el radar.\n\nPorque Kike SIEMPRE sabe dónde hay gente. Dónde hay ambiente. Dónde hay tías. Nadie sabe cómo lo hace: no consulta nada, no pregunta a nadie. Simplemente LO SABE.\n\n«Nos pasamos primero por el Green Daila, que a estas horas está tranquilo y se puede hablar. Luego La Casona, que hay un cumpleaños de enfermeras. Y de ahí a La Loca, que los sábados a las once explota. Y luego otra vez al Green, ya de noche.»\n\nNadie discute jamás la ruta de Kike. Green Daila de tarde, La Casona, La Loca y Green Daila de noche: ese es el circuito, ha sido siempre ese circuito, y el radar no falla.",
+    opts:[
+      {t:"«A la orden. El radar manda.»", out:{r:"Kike asiente satisfecho y arranca la marcha. Llegáis a La Casona y, efectivamente: cumpleaños de enfermeras. VEINTE. Te giras hacia Kike con la pregunta en la cara y él se limita a tocarse la sien: «El radar, chavea. El radar.» Pocho aprovecha el asombro para invitarte a la primera. Se acepta. Siempre se acepta.", fx:{resp:+7, alc:+9}}},
+      {t:"«¿Y tú cómo sabes eso, Kike?»", out:{r:"Kike te mira largo, muy largo. «Yo lo sé todo.» No sonríe. No parpadea. Suena su móvil, lo rechaza sin mirar, y repite: «TODO.» Faé te susurra por detrás: «No preguntes. Llevamos años sin preguntar. Es mejor así.» El radar es como las llamadas: un misterio protegido.", fx:{resp:-2, alc:+8}}}
+    ]},
+  pool:[
+    {ch:"salme", text:"Salme detecta un grupo de tres amigas en la barra. TRES. El número mágico. Pero atención, porque el maestro NO se acerca: Salme jamás entra en persona. Saca el móvil, y en cuarenta segundos de dedo prodigioso YA TIENE el Instagram de una de ellas. Sin preguntarle el nombre. Sin mirarla dos veces.\n\n«Aspirante, hoy asciendes: eres mi asesor de contenido. ¿Qué le mando primero?»",
+      opts:[
+        {t:"Ayudarle a elegir el primer mensaje", roll:{stat:"dig", dc:70, ok:{r:"Deliberáis como dos estrategas sobre el mapa. Descartas el «hola guapa» (amateur), descartas el fuego (quemado) y propones responder a su última story con UNA pregunta inteligente. Salme te mira despacio: «...Eso es BUENO.» Lo manda. A los cuatro minutos, las tres amigas miran hacia vuestra barra riéndose. Contacto establecido. «Asesor titular», sentencia.", fx:{resp:+13, alc:+7}}, ko:{r:"Propones un audio «que es más personal». Salme te mira como si hubieras sugerido pescar con dinamita: «¿Un AUDIO? ¿En el primer contacto? Chavea, esto es AJEDREZ.» Manda lo suyo, funciona (obviamente), y te quedas de aprendiz degradado mirando cómo trabaja el maestro. Aún te queda mucho Instagram por vivir.", fx:{resp:+3, dig:-6, alc:+7}}}},
+        {t:"Observar al maestro desde la barra", out:{r:"Decides que esto hay que estudiarlo desde fuera, como un documental. Verlo operar el Instagram a esa velocidad, con ese porcentaje de acierto, sin despeinarse... es un MÁSTER. Sigues sin entender cómo lo hace. Nadie lo entiende. Kike, a tu lado, mirando también: «Llevo quince años estudiándolo. Nada.»", fx:{resp:+4, alc:+6}}},
+        {t:"«¿Y si vas y le hablas en persona, Salme?»", out:{r:"Salme baja el móvil muy despacio y te mira con lástima pedagógica: «¿En PERSONA? ¿A pelo? ¿Sin señales previas?» Niega con la cabeza. «En persona se remata, chavea. Pero se entra por AQUÍ.» Golpea la pantalla dos veces. Kike asiente desde su copa: quince años de observación confirman la doctrina.", fx:{resp:-4, alc:+5}}}
+      ]},
+    {ch:"kike", text:"Kike y Salme comparten esquina de barra en comunión silenciosa, cada uno con su copa. Recuerdas que llevas guardado un tesoro en el móvil: el perfil de una influencer de gimnasio-y-bikini que te apareció el otro día. Contenido de máxima calidad contrastada. ¿Es el momento?",
+      opts:[
+        {t:"Enseñarles el perfil sin mediar palabra", out:{r:"Les plantas el móvil delante en silencio, como quien muestra un salvoconducto. La reacción es INMEDIATA y sincronizada: Kike deja la copa. Salme se inclina. «Madre. Mía.», dice uno. «¿CÓMO se llama? Pásamelo YA», dice el otro, con el dedo ya en seguir. Durante diez minutos sois tres científicos ante un descubrimiento. Acabas de encontrar el idioma común definitivo con los dos.", fx:{resp:+11, alc:+5}}},
+        {t:"Dosificarlo: «Tengo algo... pero para luego»", out:{r:"El anuncio genera una expectación desmedida. Kike te mira cada diez minutos el resto de la noche articulando «¿YA?» desde lejos. Cuando por fin lo enseñas, en el momento cumbre, el efecto es DOBLE. Salme aplaude. «El chavea sabe de tempos», reconoce Kike. La dosificación: técnica de maestro.", fx:{resp:+8, alc:+6}}},
+        {t:"Guardártelo, no parecer demasiado ansioso", out:{r:"Decisión conservadora y errónea: te guardas el as y la conversación muere de causas naturales. Lo que no sabes es que enseñar perfiles de influencers a Kike y a Nacho no es ansia: es DIPLOMACIA. Es su idioma oficial. Has tenido la llave del reino en el bolsillo y no la has usado.", fx:{resp:-2, alc:+5}}}
+      ]},
+    {ch:"amigo", text:"Pocho guarda el móvil y anuncia, con la naturalidad de quien comenta el tiempo:\n\n«Ah, por cierto. Que se viene un amigo mío.»\n\nSilencio. Los chaveas se miran entre ellos. Nadie pregunta quién es, porque saben que no van a reconocer el nombre. Ni lo van a llegar a saber, de hecho: es una tradición no escrita que los amigos de Pocho no se presentan nunca formalmente y que al final de la noche nadie sabe cómo se llaman.\n\n«¿Y quién es?», preguntas tú, que eres nuevo.\n\nPocho sonríe: «Un personaje. De novela de ficción, chavea. De NOVELA DE FICCIÓN.»\n\nY veinte minutos después aparece. {AD}",
+      opts:[
+        {t:"Presentarte y darle conversación de verdad", out:{r:"Te lanzas. Y en cuarenta minutos te ha contado tres historias imposibles de verificar, te ha ofrecido un negocio y te ha explicado una teoría propia sobre el sueño. En ningún momento os habéis dicho vuestros nombres y a ninguno de los dos le ha parecido raro.\n\nAl rato miras alrededor: está integrado. Guille lo abraza. Faé le pide su opinión sobre algo. Ya nadie recuerda que hace una hora no existía. Pocho te guiña un ojo: «¿Ves? Personaje.»", fx:{resp:+10, alc:+7}}},
+        {t:"«Pocho, ¿de dónde sacas a esta gente?»", out:{r:"Pocho se lo piensa de verdad, con la copa a media altura. «No lo sé, chavea. Aparecen.» Pausa. «Yo creo que me buscan ellos.»\n\nY es la explicación más razonable que existe: hay un imán en este hombre que atrae personajes de novela de ficción y los deposita en los Chavea Days. Lleva quince años pasando. El grupo ya lo da por hecho meteorológico.", fx:{resp:+7, alc:+6}}},
+        {t:"Preguntarle cómo se llama", out:{r:"Se lo preguntas. Y en ese instante, exactamente en ese instante, el tío se gira porque Faé le está gritando algo desde la otra punta del bar, contesta a Faé, vuelve, y retoma la conversación por otro sitio completamente distinto.\n\nNo te ha contestado. No lo ha hecho a propósito. Simplemente es así como funciona esto, y a lo largo de la noche lo intentarás dos veces más con el mismo resultado.", fx:{resp:+4, alc:+5}}}
+      ]},
+    {ch:"pocho", text:"En La Loca hay cola en la barra. Cuatro filas de gente, camareros desbordados, imposible pedir. Los chaveas se resignan a esperar.\n\nPocho desaparece.\n\nTres minutos después vuelve con cuatro copas, un chupito de cortesía y —no se sabe cómo— la simpatía personal del camarero, que ahora le atenderá de aquí al final de la noche por encima de todo el mundo. Nadie le ha visto hacer cola. Nadie le ve nunca hacer cola.\n\nTe pasa una copa: «La tuya. Y toma, guárdame esto», y te deja el chupito en la mano.",
+      opts:[
+        {t:"Preguntarle cómo consigue esto siempre", out:{r:"«Se llega antes, se pide bien y se da las gracias», dice como si fuera obvio. «Y a la tercera vez que vienes, el camarero ya sabe cómo te llamas.»\n\nEs la revelación más aburrida y más útil de la noche: el arte de Pocho no es magia, es CONSTANCIA. Salme, que escucha a medias, no lo entiende. Kike sí. El Turko asiente lentamente.", fx:{resp:+9, alc:+8}}},
+        {t:"Aprender: ir tú a por la siguiente ronda a su lado", out:{r:"Te pegas a él como aprendiz y observas la técnica: contacto visual, pedido claro y corto, propina discreta, nombre del camarero. Vuelves con seis copas y sin haber esperado.\n\nPocho te da dos palmadas en la espalda: «Ya tienes oficio, chavea.» Es el único título que reparte y lo acabas de sacar.", fx:{resp:+13, din:-18, alc:+8}}},
+        {t:"Bebértelo todo y dejar que él se ocupe", out:{r:"Aceptas la copa, aceptas el chupito «guardado» (que te bebes en cuanto se gira) y te dejas atender como un señorito toda la noche.\n\nFunciona. Bebes gratis. Pero cuando Pocho pasa por décima vez con copas para todos y tú sigues sentado, el Turko lo comenta en voz baja: «El chavea se está acostumbrando.» Y eso, dicho por el Turko, es un aviso.", fx:{resp:-6, alc:+13}}}
+      ]},
+    {ch:"fae", text:"CATÁSTROFE ANUNCIADA: Faé ha encontrado un bazar abierto y ha salido con una TROMPETA DE JUGUETE. La historia se repite, como en aquella discoteca. La está tocando ya por la calle, mal y fuerte. De pronto te la ofrece: «Toca, aspirante. TOCA.»",
+      opts:[
+        {t:"Tocar la trompeta por todo el bar", out:{r:"Le das al pistón sin complejos: PRAAAAA. El bar se gira. Faé llora de emoción: «¡TIENE EL DON!» Os turnáis la trompeta el resto de la noche como un estandarte de guerra. El camarero os odia. El grupo te adora. Balance positivo.", fx:{resp:+11, dig:-8, alc:+5}}},
+        {t:"«El artista eres tú, Faé. Yo soy tu público.»", out:{r:"Jugada maestra: alimentar al artista. Faé, henchido, se sube al altavoz apagado y da un concierto de tres minutos que quedará en los anales. Tú aplaudes desde abajo. Él triunfa, tú conservas la dignidad, y además te señala: «¡Mi representante!»", fx:{resp:+7, alc:+5}}},
+        {t:"Esconderle la trompeta cuando se despiste", roll:{stat:"dig", dc:78, ok:{r:"Operación quirúrgica: la trompeta desaparece dentro de una maceta (las macetas están siendo tus grandes aliadas hoy). Faé la busca desconsolado un rato y luego se le olvida. El camarero, que lo ha visto todo, te trae un chupito de gratitud: «Invita la casa, héroe.»", fx:{resp:+4, alc:+8}}, ko:{r:"Te pilla EN EL ACTO, con la mano en la maceta. «¿TÚ?» El drama es shakespeariano: te señala ante el grupo entero como el Judas de la trompeta. Tu condena: tocarla tú el resto de la noche CADA VEZ que Faé lo ordene. Y lo ordenará.", fx:{resp:-6, dig:-9}}}}
+      ]},
+    {ch:"guille", text:"En La Loca, Guille lleva dos copas por encima del umbral y ha entrado en la fase intermedia: la fase de las TEORÍAS.\n\nTe ha llevado a un rincón, ha apartado dos taburetes para tener espacio y está usando una servilleta, un mechero y tu vaso para demostrarte algo. La explicación es apasionada, técnicamente rigurosa en un 60% y completamente incomprensible en el resto.\n\n«¿Lo VES? ¿Ves por qué esh imposible?»\n\nNo ves nada. El mechero se ha caído dos veces.",
+      opts:[
+        {t:"Decirle que sí lo ves y pedirle que siga", out:{r:"«¡GRASHIAS!», grita. «¡NADIE me deja terminar NUNCA!»\n\nY termina. Once minutos. Y lo asombroso es que el final tiene sentido: llegas a entender de verdad lo que te estaba explicando y hasta le haces una pregunta buena, que él contesta con una precisión sorprendente para su estado.\n\nEl ingeniero está ahí dentro, entero. Solo hay que tener la paciencia de esperarle.", fx:{resp:+11, ene:-6}}},
+        {t:"Reordenarle los objetos y explicárselo tú", out:{r:"Coges la servilleta, el mechero y el vaso, los colocas bien y le devuelves su propia teoría ordenada.\n\nGuille se queda mirando la mesa en silencio absoluto. Luego te mira. Luego la mesa otra vez.\n\n«...Esho es exactamente lo que quería decir.» Y te da un abrazo tan intenso que tira el vaso y destruye el modelo. Ha valido la pena.", fx:{resp:+12, ene:-5, din:-4}}},
+        {t:"«Guille, luego me lo cuentas, que estamos de fiesta.»", out:{r:"Error de cálculo. Interrumpir una teoría de Guille a mitad no la cancela: la POSPONE, y mientras está pospuesta se acumula presión.\n\nDos horas más tarde, en plena discoteca, con la música a tope, te agarrará por los hombros para retomarla exactamente donde la dejó. Y ahí ya no habrá servilleta ni mechero, solo gritos.", fx:{resp:-4, alc:+6}}}
+      ]},
+    {ch:"turko", text:"Salís a la puerta de La Casona y el Turko enciende uno. Lleva ocho horas de Chavea Day y sigue exactamente igual que a las dos de la tarde: misma sonrisa, mismo ritmo, misma paz.\n\nDe pronto pregunta, sin dramatismo ninguno: «Chavea, ¿tú sabes por qué yo aguanto?»\n\nY antes de que contestes, se responde solo:\n\n«Porque a mí esto no me altera. A vosotros os SUBE. A mí me pone... a nivel.»",
+      opts:[
+        {t:"«¿A nivel de qué?»", out:{r:"«A nivel», repite, como si eso lo explicara todo. Y en su caso lo explica.\n\nDurante los siguientes veinte minutos te da la clase magistral definitiva del Chavea Day: no hay que llegar arriba, hay que llegar LEJOS. El que sube rápido baja rápido. El que se pone a nivel dura veinte horas.\n\nEs sabiduría barata de puerta de bar y a la vez es rigurosamente cierta: él es la prueba viviente.", fx:{resp:+10}}},
+        {t:"«Yo creo que aguantas porque eres un fenómeno.»", out:{r:"El Turko se ríe con la boca cerrada, sin negarlo, que es su forma de aceptar un cumplido.\n\n«Bueno. Práctica también.» Da una calada. «Mucha práctica.»\n\nY ahí está la clave: no es genética, es OFICIO. Décadas de oficio. El grupo lleva media vida creyendo que el Turko tiene un don y resulta que lo que tiene son horas de vuelo.", fx:{resp:+8}}},
+        {t:"Contarle que a ti ya te está costando", roll:{stat:"dig", dc:55, ok:{r:"Le confiesas la verdad: que llevas ocho horas, que la cabeza te va a otro ritmo y que no sabes si vas a llegar.\n\nEl Turko asiente sin juzgar, tira el cigarro y dice: «Pues vamos a arreglarlo.» Te trae un vaso de agua, te hace fumar despacio y te tiene diez minutos en la puerta hablando de nada.\n\nCuando volvéis dentro estás nuevo. Nadie más se habría dado cuenta, y nadie más lo habría arreglado sin decírselo a los demás.", fx:{resp:+9, ene:+14, alc:-8}}, ko:{r:"Intentas confesarlo pero te sale como una bravata: «Bueno, yo estoy PERFECTAMENTE, mejor que nadie.»\n\nEl Turko te mira un segundo de más. No dice nada. Y ese segundo de más es la evaluación completa: sabe exactamente cómo estás, sabe que has mentido y sabe que no ibas a admitirlo.\n\n«Ya. Pues nada.» Y vuelve dentro. Has perdido la única ayuda que se ofrecía gratis.", fx:{resp:-5, ene:-5}}}}
+      ]},
+    {ch:"pocho", text:"En un aparte de barra, Pocho se te acerca con esa sonrisa suya de estar más cariñoso de la cuenta. Baja la voz: «Chavea... ¿tú confías en mí?» Se toca el bolsillo mágico de la chaqueta. Las legendarias «trampas» de Pocho, de las que hablan las crónicas. No pregunta dos veces.",
+      opts:[
+        {t:"«Confío, pero hoy paso. Respeto, mediocentro.»", out:{r:"Pocho asiente despacio y te da una palmada: «RESPUESTA CORRECTA. Las trampas no se ofrecen, se ganan. Y no se aceptan a la primera. Hay que saber decir que no... para que el sí valga algo.» Te acaba de dar una clase de filosofía pochista y además has aprobado sin saberlo.", fx:{resp:+10}}},
+        {t:"«¿Qué llevas exactamente ahí, Pocho?»", out:{r:"Error de protocolo GRAVE. Pocho se cierra la chaqueta con gesto ofendido: «Las trampas NO SE PREGUNTAN, chavea. Las trampas SE CONFÍAN.» Se aleja hacia Alberto de la Puente, que jamás pregunta nada. Has perdido puntos con el mediocentro, y eso se nota en todo el equipo.", fx:{resp:-7}}},
+        {t:"Asentir en silencio como los veteranos", out:{r:"Un asentimiento lento, sin palabras. Pocho lo interpreta como sabiduría y decide que la conversación ha ido perfectamente aunque no haya pasado nada, que es exactamente como funcionan las mejores conversaciones con Pocho a estas horas. Te invita a la siguiente copa.", fx:{resp:+6, alc:+9}}}
+      ]},
+    {ch:"puente", text:"La puerta del bar se abre de golpe y entra ALBERTO DE LA PUENTE con los brazos ya abiertos, antes incluso de haber identificado a nadie. Empieza la ronda de abrazos: abraza a Juanjo, abraza al Turko, abraza a Guille, abraza a Faé, abraza a un señor de la barra que no conoce de nada y que se deja.\n\nEntonces localiza a Salme y la discoteca entera lo oye:\n\n«¡¡NASHOOOOOOO!!»\n\nY acto seguido, en cuanto ve a Pocho, cambia de registro a un canturreo hipnótico mientras le agarra la cara con las dos manos:\n\n«Pochín pochín pochín pochín...»\n\nY entonces te ve a ti. Aspirante desconocido. Brazos abiertos. Viene.",
+      opts:[
+        {t:"Abrirte de brazos y recibir el abrazo entero", out:{r:"Te levanta del suelo. Literalmente. Un hombre que ha corrido 15 km esta mañana «para hacer hueco» tiene una fuerza que no es de este mundo. «¡EL NUEVO! ¡EL NUEVOOO!», ruge, y automáticamente te bautiza con un diminutivo: a partir de ahora eres «chaveíta chaveíta chaveíta» y responderás a ello el resto de tu vida. Ser nombrado por De la Puente es un sacramento.", fx:{resp:+12, ene:-5, alc:+10}}},
+        {t:"Devolvérsela: «¡¡PUENTEEEE!!» a pleno pulmón", out:{r:"Le gritas TÚ primero, con el mismo volumen y la misma vocal alargada. Alberto frena en seco, procesa un segundo... y estalla: «¡¡ESTE CHAVEA ES DE LOS NUESTROS!!» Te abraza el doble de fuerte y le anuncia al bar entero que hoy invitas tú, cosa que no has dicho. Pero el respeto ganado compensa las rondas.", fx:{resp:+14, alc:+14, din:-15}}},
+        {t:"Tenderle la mano para saludar formalmente", out:{r:"Le tiendes la mano. Alberto la mira. Mira la mano. Mira al grupo. Mira otra vez la mano. Y luego te abraza IGUAL, ignorando la mano por completo, mientras Faé narra la escena: «¡Le ha ofrecido la MANO! ¡A DE LA PUENTE!» Aprendes la lección más rápida del día: a este hombre no se le da la mano. A este hombre se le abraza.", fx:{resp:-3, alc:+9}}}
+      ]},
+    {ch:"kike", text:"Kike, recuperado el habla tras su bache de la sobremesa (nadie sabe cómo, se sospecha que la llamada 23 lo reinició), te enseña el móvil con orgullo: fotos del Land Rover. Luego la moto. Luego «el otro coche».\n\n«¿Tú qué llevas?», te pregunta. La pregunta trampa definitiva del típico tío tío.",
+      opts:[
+        {t:"«Un utilitario... pero con historias.»", out:{r:"«Las historias son lo que importa», concede Kike con solemnidad de concesionario filosófico, y te enseña 14 fotos más del Land Rover en distintos ángulos y barros. Apruebas la prueba del motor por humildad bien plantada.", fx:{resp:+6}}},
+        {t:"«¿Y para qué quiere alguien TRES vehículos?»", out:{r:"Kike te mira como si le hubieras preguntado para qué quiere alguien tres amigos. «No es cuestión de PARA QUÉ, es cuestión de POR QUÉ NO.» La mesa entera asiente. Acabas de recibir una lección de economía chavea de un hombre que gestiona zonas ORA. Reflexiona.", fx:{resp:-3, alc:+5}}},
+        {t:"«¿Me llevas un día en el Land Rover?»", out:{r:"Has tocado LA tecla. A Kike se le ilumina la cara: «¿El sábado te viene bien?» Te enseña rutas, barrizales, un vídeo del coche saliendo de un río. Tenéis un plan cerrado antes del siguiente trago. Los chaveas observan: el aspirante ya hace planes por separado con miembros del grupo. Muy buena señal.", fx:{resp:+9}}}
+      ]},
+    {ch:"salme", text:"Salme se te acerca con la copa en una mano y el móvil en la otra, y te lanza LA pregunta. La pregunta que le hace a todo aspirante, a todo recién llegado, a todo desconocido que se cruza en su camino desde aproximadamente 2009:\n\n«Oye, chavea... ¿tú no conocerás un grupito de tías bueno?»\n\nNo es una pregunta. Es un censo. Salme lleva media vida haciendo este trabajo de campo con la constancia de un funcionario.",
+      opts:[
+        {t:"«Pues mira, igual sí. Déjame que escriba.»", out:{r:"Salme deja la copa. LA COPA. Se sienta a tu lado con la atención de un inversor ante un unicornio. «Cuéntame. Cuántas. De dónde. ¿Salen hoy?» Escribes a un grupo cualquiera para no defraudarle y él supervisa la redacción del mensaje palabra por palabra. Vengan o no, ya te has ganado el puesto de proveedor oficial. Kike, celoso: «A mí nunca me lo pregunta con tanto interés.»", fx:{resp:+12, alc:+5}}},
+        {t:"«¿Un grupito? Salme, si tú conoces a media ciudad.»", out:{r:"«Conocer conozco», admite con la humildad del profesional, «pero yo lo que busco es un grupito NUEVO. Fresco. Sin historial.» Lo dice como un ojeador de fútbol hablando de canteras. Es a la vez lo más ridículo y lo más admirable que has oído hoy. Le invitas a una copa por la dedicación.", fx:{resp:+6, alc:+6, din:-8}}},
+        {t:"«No conozco a nadie, tío. Lo siento.»", out:{r:"Salme asiente sin inmutarse, ya mirando por encima de tu hombro hacia el siguiente sujeto del censo. «Tranquilo. Pregunto a todo el mundo.» Y se va. Literalmente a los diez segundos oyes, a tres metros: «Oye, ¿tú no conocerás un grupito de tías bueno?» Es implacable. Es admirable. Y has perdido tu turno.", fx:{resp:-2, alc:+5}}}
+      ]},
+    {ch:"fae", text:"Faé se ha subido a algo. Nunca se sabe a qué, pero siempre hay algo a lo que subirse. Y ha decidido que este grupo necesita un HIMNO. Ahora mismo. Se lo está inventando EN DIRECTO, sobre la marcha, con una métrica dudosa y una convicción absoluta:\n\n«¡QUE-SE-BE-BAAA! ¡QUE-SE-BE-BAAA! ¡EL-QUE-NO-BE-BA-ES-UN... UN...»\n\nSe queda en blanco. Necesita la rima. Te mira. TE MIRA A TI. El bar entero espera.",
+      opts:[
+        {t:"Rematar la rima gritando lo primero que se te ocurra", roll:{stat:"dig", dc:60, ok:{r:"«¡...UN CANTAMAÑANAS!» Faé se queda mudo medio segundo y explota: «¡¡CANTAMAÑANAS!! ¡¡ESO!!» El bar entero corea tu palabra durante cuatro minutos seguidos. A partir de esta noche, «cantamañanas» es un insulto oficial del grupo y se usará durante años. HAS APORTADO VOCABULARIO. Eso es inmortalidad chavea.", fx:{resp:+15, dig:-5, alc:+6}}, ko:{r:"«¡...UN MALA PERSONA!» No rima. No escande. No funciona. Faé te mira con dolor artístico genuino: «Chavea... eso no rima con NADA.» Improvisa él («¡...UN PENDONGO SIN ALMA!») y se lleva la ovación. Lo tuyo queda como el borrador descartado de un himno. Aún así, participaste.", fx:{resp:+4, dig:-7, alc:+6}}}},
+        {t:"Hacerle los coros y la percusión con la barra", out:{r:"Golpeas la barra marcando el compás mientras Faé improvisa cinco estrofas más, cada una con un insulto nuevo inventado sobre la marcha («¡chorlito de bar!», «¡mediotrago!», «¡copichuela!»). El camarero os pide que paréis y luego se une. Faé te nombra su sección rítmica oficial.", fx:{resp:+10, dig:-4, alc:+5}}},
+        {t:"Grabarlo todo en vídeo para el grupo", out:{r:"Documentas el nacimiento del himno en 4K vertical. El vídeo circulará por el grupo durante meses y será citado en cada Chavea Day futuro. Faé, al verlo al día siguiente, no recordará haberlo compuesto y preguntará: «¿Quién ha escrito esto? Es BUENÍSIMO.» Eres el archivero de la mitología. Trabajo silencioso pero eterno.", fx:{resp:+7, alc:+5}}}
+      ]},
+    {ch:"turko", text:"El Turko lleva la misma sonrisa serena desde las 14:00. Ha bebido lo mismo que todos y ha hecho cuatro visitas a «fachadas» de interés arquitectónico variable, pero ahí está: impecable, ecuánime, eterno. Te apoya el codo en el hombro: «¿Sabes cuál es el secreto, chavea?»",
+      opts:[
+        {t:"«¿Cuál es el secreto, Turko?»", out:{r:"«El equilibrio.» Da una calada lenta. «Todo en su medida. Todo a su ritmo. Yo nunca voy mal... voy RELATIVAMENTE bien. La relatividad, chavea. Einstein iba de esto.» Es la mayor mentira estructural jamás construida por un arquitecto, y sin embargo, en él, es VERDAD. Asientes con reverencia.", fx:{resp:+8}}},
+        {t:"«El secreto es que tú estás hecho de otra pasta.»", out:{r:"El Turko sonríe y no lo niega, porque es empíricamente cierto: décadas de observación científica del grupo lo confirman. «Cuando todos caigáis», dice sin dramatismo, «yo apagaré la luz.» Y sabes, con certeza absoluta, que así será. Siempre ha sido así.", fx:{resp:+6}}},
+        {t:"Intentar seguir SU ritmo exacto de consumo", roll:{stat:"alc", dc:85, ok:{r:"Durante una hora completa replicas el protocolo Turko: mismo trago, misma pausa, misma serenidad. Y funciona. FUNCIONA. Te sientes ecuánime, eterno, arquitectónico. El Turko te observa de reojo: «Interesante, chavea. Interesante.» Es lo más parecido a un doctorado que da este grupo.", fx:{resp:+12, alc:+8}}, ko:{r:"Craso error conceptual: el ritmo del Turko no es una técnica, es una CONDICIÓN GENÉTICA. A los cuarenta minutos de imitarlo, el suelo empieza a tener opiniones propias. El Turko te sujeta con una mano sin dejar de fumar con la otra: «El equilibrio no se copia, chavea. Se nace.»", fx:{alc:+18, dig:-6, resp:+3}}}}
+      ]}
+  ]
+},
+/* ---------- FASE 4: LA DISCOTECA ---------- */
+{
+  name:"GREEN DAILA", clock:"00:30 · Zona de cortinas", pick:3, drift:{alc:+8, ene:-12, din:-15},
+  tag:"Vuelta al Green, pero de noche. Luces, cortinas (peligro histórico) y el grupo en su máximo esplendor.",
+  intro:{ch:"grupo", text:"Segunda visita al Green Daila del día, y no se parece en nada a la de la tarde. Ahora hay luces, hay cola y hay volumen. Entráis en formación de cuña, Faé en la punta como mascarón de proa, saludando al segurata como si lo conociera (probablemente lo conoce).\n\nDentro: reservado conseguido por Salme mediante artes desconocidas, Pocho ya de camino a la barra sin que nadie le haya pedido nada, y —lo ves y se te hiela la sangre— CORTINAS. Cortinas rojas, largas, elegantes. El historial de este grupo con las cortinas de discoteca es literalmente lo peor que existe.",
+    opts:[
+      {t:"Entrar a la pista con todo", out:{r:"Te entregas. Los chaveas te rodean en círculo en algún momento indeterminado y te ves bailando en el centro sin saber cómo has llegado ahí. Es un bautismo. Todo grupo tiene sus liturgias y acabas de pasar una.", fx:{resp:+8, ene:-10, alc:+6}}},
+      {t:"Asegurar el reservado y las copas primero", out:{r:"Mentalidad logística: alguien tiene que custodiar las copas, y ese alguien gana siempre el respeto silencioso del grupo. Pocho te deja al mando del reservado con un gesto: acabas de ser nombrado intendente. Es un honor discreto pero real.", fx:{resp:+5, din:-10, alc:+7}}}
+    ]},
+  pool:[
+    {ch:"juanjo", text:"ALERTA MÁXIMA. Juanjo lleva un rato callado con la mirada perdida y los carrillos en posición de precarga. Ha bebido vino en la comida. VINO. Las condiciones son EXACTAMENTE las de la histórica noche de las cortinas rojas. Y está... se está acercando a las cortinas. La historia llama a la puerta.",
+      opts:[
+        {t:"Interceptarlo y redirigirlo al baño con urgencia", roll:{stat:"ene", dc:65, ok:{r:"Sprint heroico entre la multitud. Lo alcanzas, lo giras con suavidad de estibador experto y lo escoltas al baño, donde la historia transcurre por el cauce oficial. Al salir, Juanjo te mira con los ojos húmedos del superviviente: «Las cortinas... estaban ahí... y tú me salvaste.» Los chaveas lo han visto TODO. Ovación.", fx:{resp:+15, ene:-8}}, ko:{r:"Llegas medio segundo tarde. MEDIO SEGUNDO. La historia se repite con una fidelidad escalofriante: mismo color, misma cortina, mismo arco balístico. El grupo entero contempla el momento en silencio reverencial, como quien ve un cometa que pasa cada 15 años. Evacuación de emergencia del local. Otra vez.", fx:{resp:+6, dig:-5, ene:-10}}}},
+        {t:"Ofrecerle un cigarro para distraer al ácido", out:{r:"Jugada de veterano: el cigarro es el único protocolo homologado contra el pre-ácido. Juanjo lo acepta por puro acto reflejo y el sistema se estabiliza en la puerta, lejos del textil. «Controlado», informa después a la mesa, como un parte médico. Los que sabían del riesgo te miran con respeto nuevo.", fx:{resp:+10}}},
+        {t:"Dejar que el destino escriba su segunda parte", out:{r:"Decides no intervenir en los asuntos de los dioses. Y los dioses, esta vez, son clementes: Juanjo se detiene a un metro de las cortinas, traga con la épica silenciosa de siempre, y vuelve a la barra como si nada. Te has librado. Pero Pocho te vio verlo y no hacer nada, y esa mirada te la llevas puesta.", fx:{resp:-4, alc:+5}}}
+      ]},
+    {ch:"fae", text:"Localizas a Faé en la penumbra con una postura corporal inconfundible, orientado hacia... no. NO. Hacia las cortinas del fondo. El OTRO episodio histórico de cortinas del grupo. Por esto exactamente os echaron de aquella discoteca. Está desabrochándose... tienes tres segundos.",
+      opts:[
+        {t:"Placaje suave y desvío hacia los baños", out:{r:"Llegas en DOS segundos. Brazo por encima, giro de 90 grados, «por aquí, artista», y Faé se deja llevar entre risas hasta el baño, donde mear es legal y hasta recomendable. Acabas de salvar la noche entera del grupo, porque una segunda expulsión por cortinas habría sido demasiado historial ya. Pocho te declara oficialmente «útil».", fx:{resp:+13, ene:-5}}},
+        {t:"Hacer de vigía mientras la historia se repite", roll:{stat:"dig", dc:75, ok:{r:"Contra todo pronóstico, tu labor de contravigilancia funciona: bloqueas la línea de visión del segurata con una coreografía improvisada de baile-pantalla. Faé completa su obra. Nadie ve nada. Es lo peor que has hecho en tu vida y también, según los estándares de este grupo, lo más noble. «Cómplice de leyenda», te susurra.", fx:{resp:+9, dig:-10}}, ko:{r:"El segurata os pilla A LOS DOS: al autor y a su cómplice-pantalla, que resulta ser el delito más ridículo de encubrir del mundo. Expulsión inmediata de ambos. Esperáis al grupo en la puerta como dos colegiales castigados. Cuando salen y se enteran, el respeto sube por la nobleza y baja por la ejecución. Empate técnico tirando a caro.", fx:{resp:+3, dig:-12, din:-10}}}},
+        {t:"Avisar al segurata para prevenir males mayores", out:{r:"TRAICIÓN. Puede que hayas salvado las cortinas, pero has roto el código: los asuntos del grupo se gestionan DENTRO del grupo. Faé es interceptado por el segurata y te localiza con el dedo desde lejos: «¡TÚ!» El grupo entero se entera en 90 segundos. Esta te va a costar remontarla.", fx:{resp:-13, dig:+3}}}
+      ]},
+    {ch:"guille", text:"El Loko ha alcanzado su forma final. Está en medio de la pista, camisa medio fuera, manteniendo una conversación intensísima con... compruebas dos veces... sí, con una columna. De pronto te localiza. Cruza la pista hacia ti con una expresión indescifrable entre el cariño infinito y el juicio final. Es 50/50. Siempre es 50/50.",
+      opts:[
+        {t:"Abrir los brazos y aceptar tu destino", out:{r:"La moneda cae del lado bueno: ABRAZO. Un abrazo desmedido, estructural, con levantamiento de suelo incluido, mientras te grita al oído algo hermosísimo sobre los cohetes y la amistad, con un 30% de consonantes. Los chaveas os hacen fotos. Es el momento más peligroso y más bonito de la noche a la vez.", fx:{resp:+11, ene:-8}}},
+        {t:"Chocarle el puño para mantener distancia", roll:{stat:"dig", dc:70, ok:{r:"El puño funciona: Guille lo choca, lo convierte en una coreografía inventada de siete pasos que os sale accidentalmente PERFECTA, y la pista os hace corro. Habéis creado algo. Nadie sabe qué, pero algo. El Loko te corona: «Mi hermano de baile.»", fx:{resp:+9, ene:-5}}, ko:{r:"El puño en fase Loko-avanzada es interpretado como DESAFÍO. «¿Me eshtás vacilando?» Escalada instantánea. Se activa el protocolo de emergencia: Pocho por la izquierda con un chupito, el Turko por la derecha con parsimonia, y el sistema se desactiva por saturación. «Al Loko nunca un puño, SIEMPRE abrazo», te instruyen después. Lección grabada a fuego.", fx:{resp:-5, dig:-5, ene:-6}}}},
+        {t:"Señalar hacia otro lado gritando «¡GUILLE, MIRA!»", out:{r:"La maniobra del perro con la pelota. Y FUNCIONA: Guille se gira, encuentra a Alberto Hernández, y redirige toda su energía hacia él, que lo recibe encantado. Has esquivado al Loko con ingeniería social pura. El Turko lo ha visto y te dedica una calada de respeto: «Elegante.»", fx:{resp:+5}}}
+      ]},
+    {ch:"grupo", text:"Faé saca del bolsillo un bulto de tela doblado. LA BANDERA. La bandera de los chaveas, la que se regaló el año de la camiseta, la que preside cada Chavea Day desde entonces colgada donde se pueda: barandillas, respaldos, una vez el capó de un coche patrulla (asunto cerrado y no comentado).\n\nLa despliega en mitad de la discoteca y busca sitio con la mirada. Localiza el objetivo: la barandilla del reservado VIP, dos metros por encima de la zona acordonada.\n\n«Chavea. Tú eres el que menos ha bebido de los que quedan. TE TOCA.»",
+      opts:[
+        {t:"Escalar y colgar la bandera en el VIP", roll:{stat:"ene", dc:78, ok:{r:"Te encaramas a la barandilla con una agilidad que ni tú te esperabas, atas la bandera con dos nudos que Salme (capitán náutico) aprueba a gritos desde abajo, y saltas.\n\nLa bandera de los chaveas ondea sobre el VIP de la discoteca. Guille llora. Faé toca el silbato nuevo. Los de la zona VIP, sin entender nada, hacen fotos. Ha entrado en el histórico y estabas TÚ arriba.", fx:{resp:+15, ene:-12, dig:-4}}, ko:{r:"Subes, atas la bandera... y el nudo se deshace en cuanto sueltas. La bandera cae en toda la cara de un tipo del VIP, que se levanta ofendidísimo. Segundos de tensión diplomática hasta que ve el escudo, pregunta qué es, y Faé le suelta una explicación de siete minutos tras la cual el tipo quiere UNA CAMISETA.\n\nCaos gestionado. La bandera acaba colgada. Tú acabas con el codo pelado.", fx:{resp:+7, ene:-15, dig:-8}}}},
+        {t:"Colgarla en sitio seguro pero visible", out:{r:"Aplicas criterio: nada de VIP, nada de escaladas. La atas en la barandilla de la escalera principal, por donde pasa TODO el mundo. Visibilidad máxima, riesgo cero.\n\nFaé protesta («¡sin épica!») pero Pocho te respalda: «La bandera tiene que estar colgada AL FINAL de la noche, no arrancada a los diez minutos. El chavea ha pensado.» Y así fue: aguantó hasta el cierre.", fx:{resp:+9, ene:-4}}},
+        {t:"«¿Lleváis la bandera SIEMPRE encima?»", out:{r:"Los tres que están cerca te miran como si hubieras preguntado si respiran. «Hombre.» Y ya está. Esa es toda la respuesta que vas a obtener.\n\nFaé se la cuelga él mismo, de cualquier manera, y se cae a los cuatro minutos. Podría haber sido tu momento. La has dejado pasar por preguntar lo obvio.", fx:{resp:-3, alc:+5}}}
+      ]},
+    {ch:"hdez", text:"Se abre un corro en la pista. En el centro, Alberto Hernández se quita la chaqueta con parsimonia ceremonial, la entrega a un desconocido, y ejecuta LA VOLTERETA: aquella perfección técnica aprendida en el karate de su infancia, rotación completa, recepción limpia, los brazos en V. La discoteca ESTALLA.\n\nY entonces te señala: «AHORA EL NUEVO.»",
+      opts:[
+        {t:"Intentar la voltereta", roll:{stat:"ene", dc:80, ok:{r:"Te santiguas, coges aire, y la ejecutas: rotación no perfecta pero SÍ COMPLETA, recepción con un solo tambaleo. El corro ruge tu nombre sin conocer tu nombre («¡EL NUEVO! ¡EL NUEVO!»). Hernández te abraza: «¡Karate espiritual!» Esta noche ya es tuya.", fx:{resp:+15, ene:-12}}, ko:{r:"La física es implacable con los valientes: rotas 270 de los 360 grados necesarios y aterrizas de espaldas con un impacto que se oye POR ENCIMA de la música. El corro hace «OOOOH». Te levantan entre cuatro. «La intención ha sido de 10», dictamina Hernández. El vídeo ya circula por el grupo. Duele todo, pero puntúa.", fx:{resp:+7, dig:-12, ene:-15}}}},
+        {t:"Responder con tu propio movimiento estrella", out:{r:"No compites con la voltereta: OFRECES OTRA COSA. Tu movimiento (una mezcla de robot y flamenco que no sabías que tenías dentro) descoloca al público lo justo para triunfar por sorpresa. Hernández te choca la mano: la pista se reparte en dos escuelas artísticas. Empate de leyendas.", fx:{resp:+9, ene:-8, dig:-3}}},
+        {t:"Declinar con una reverencia al maestro", out:{r:"Reverencia solemne, gesto de «no soy digno». Hernández la acepta con la nobleza del karateca: «El nuevo sabe RECONOCER.» Sales del corro intacto. Puntúa poco, pero puntúa, y tu columna vertebral te lo agradece en silencio.", fx:{resp:+3}}}
+      ]},
+    {ch:"salme", text:"Fenómeno paranormal en curso. Salme lleva 40 minutos sin apenas hablar con nadie —solo Instagram, copa, Instagram— y de pronto aparece EN EL RESERVADO... con las tres amigas detrás. No se va con ellas. NUNCA se va con ellas. Las TRAE.\n\n«Chaveas, estas son Marta, Ana y no me acuerdo. Se vienen con nosotros.»\n\nY se sienta. Y ya está. Y ellas se quedan, encantadas, integradas en el grupo como si llevaran diez años viniendo al Chavea Day.\n\nKike lo observa con la boca literalmente abierta. «Pero... si no ha HABLADO con ellas. Yo lo he estado mirando. NO HA HABLADO CON ELLAS.»",
+      opts:[
+        {t:"Ayudar a integrarlas: presentarles al grupo entero", out:{r:"Te pones en modo anfitrión y haces las presentaciones oficiales: «Este es Juanjo, no le habléis si hincha los carrillos. Este el Turko, va relativamente bien. A ese de ahí abrazadle, no le deis la mano.» Las tres se parten de risa y se quedan hasta el final. Salme te señala con la copa: «El chavea ha entendido el JUEGO. No es llevárselas. Es que se QUEDEN.»", fx:{resp:+12, alc:+5}}},
+        {t:"Preguntarle a Kike si sigue vivo", out:{r:"Kike no reacciona. Sigue mirando a Salme como quien ve levitar a alguien. «Quince años», murmura. «Quince años estudiando y todavía no he visto la TRANSICIÓN. ¿En qué momento pasan de estar allí a estar AQUÍ?» Le pones una mano en el hombro. No hay consuelo posible. Es el misterio de su vida.", fx:{resp:+7, alc:+6}}},
+        {t:"«Salme, tío, ¿cómo lo has hecho?»", out:{r:"Salme se encoge de hombros con sinceridad devastadora: «No lo sé.» Y lo peor es que es VERDAD. No lo sabe. Nunca lo ha sabido. El grupo lleva años esperando una metodología y resulta que no hay metodología, hay un DON. Pocho sentencia: «Es como preguntarle al rayo por qué cae donde cae.»", fx:{resp:+3, alc:+5}}}
+      ]},
+    {ch:"pocho", text:"Pocho te agarra del brazo y te saca a la calle sin preguntar. «Vamos a tomar el aire un momento, chavea. Que me está subiendo el asunto.»\n\nFuera, apoyado en la pared, respira hondo tres veces. Y aquí puede pasar cualquiera de las dos cosas, porque el asunto tiene dos caras y nunca se sabe cuál toca.\n\nHoy toca esta: se gira, te abraza con las dos manos en los hombros y te suelta mirándote muy fijo a los ojos:\n\n«Oye. En serio. Qué guay que hayas venido hoy. QUÉ GUAY. Lo digo de verdad, eh. De verdad de la buena.»\n\nEstá en el pico. Es el Pocho más sincero del año y solo dura unos minutos.",
+      opts:[
+        {t:"Abrazarle y decirle lo que sientes de verdad", out:{r:"Se lo dices: que ha sido el mejor día en años, que le has visto cuidar de todos toda la noche sin que nadie se lo agradezca, que es el que sostiene el grupo. Pocho se queda callado. Traga saliva. «Joder, chavea.» Otro abrazo, más largo.\n\nCuando volvéis dentro no dice nada a nadie, pero a partir de ese momento te presenta como «uno de los nuestros» en vez de como «el aspirante».", fx:{resp:+14, ene:-3}}},
+        {t:"Quedarte en silencio a su lado mirando la calle", out:{r:"No dices nada. Os quedáis los dos apoyados en la pared, viendo pasar taxis a las tres de la mañana.\n\nY entonces asoma la otra cara, sin transición y sin una gota de mala intención: «Chavea... cállate un ratito.» — «Si no estoy hablando.» — «Ya. Sigue así.»\n\nY os quedáis otros cinco minutos en silencio, que resultan ser los mejores cinco minutos del día. Algunas cosas del Chavea Day no llevan palabras.", fx:{resp:+12, ene:+5}}},
+        {t:"Aprovechar para contarle una historia tuya", out:{r:"Arrancas una anécdota de las tuyas. A la segunda frase, Pocho levanta un dedo, muy tranquilo, sin girarse:\n\n«Chavea... cállate un ratito.»\n\nAhí está la otra cara. Te callas a mitad de palabra. Faé, que lo ha visto desde la puerta: «¡Le ha hecho LA MIRADA! ¡Al chavea le han hecho la mirada!»\n\nLección aprendida: cuando Pocho sale a tomar el aire, o habla él o no habla nadie.", fx:{resp:-7, dig:-3}}}
+      ]},
+    {ch:"pocho", text:"Tres y media de la mañana y Pocho está EN SU MEJOR MOMENTO.\n\nLe ha subido el asunto y con los suyos eso significa que está a tope: abraza a Juanjo, le canturrea el «pochín pochín pochín» a De la Puente, se ríe de todo, cuenta cosas buenísimas y ha hecho llorar de risa a Faé dos veces en cinco minutos.\n\nPero hay un detalle. Llegáis a la barra, el camarero se acerca... y Pocho se apaga como una bombilla. Mira al suelo. Da un paso atrás.\n\nCon los chaveas está imparable. Con gente de fuera, en este estado, no puede. Ni una palabra. Y un camarero es gente de fuera. El mismo hombre que hace cuatro horas se ganaba a un camarero en tres minutos ahora mismo no es capaz de mirarle a la cara.\n\nTe pone un billete en la mano sin mirarte: «Pide tú.» Y se gira otra vez hacia el grupo, donde ya vuelve a ser el rey.",
+      opts:[
+        {t:"Pedir las copas... y un vaso de agua para él", out:{r:"Pides la ronda y, sin decir nada, le pones delante un vaso de agua.\n\nPocho lo mira. Y ocurre algo casi religioso: se lo bebe DE UN TRAGO, cerrando los ojos, como un hombre que cruza el desierto y encuentra un pozo. Lo deja en la barra vacío.\n\n«Ufff.» Te agarra la cara con las dos manos. «El AGUA. Chavea. EL AGUA.»\n\nY acto seguido, restaurado, pide un chupito y se lo bebe encima. Porque así funciona esto: el agua no sustituye nada aquí, el agua REPARA para poder seguir. Alberto de la Puente lo ha visto de reojo desde el fondo y ya viene hacia ti con la mano levantada: «¡¡A MÍ OTRO!!»", fx:{resp:+16, din:-15, ene:+12, alc:+6}}},
+        {t:"Coger el billete y pedir sin comentar nada", out:{r:"Ni preguntas ni te ríes. Coges el billete, pides las rondas y le pasas la suya. Pocho la coge y sigue a lo suyo, que es hacer que los otros seis se lo pasen bien.\n\nDe aquí al final de la noche pides tú. Y funciona: desde fuera nadie nota nada raro, porque Pocho está brillando con los suyos como nunca.\n\nAl final, sin dejar de hablar con Guille, te busca con la mirada y te hace un gesto minúsculo con la cabeza. Ya está. Nunca lo hablaréis.", fx:{resp:+14, din:-15, ene:-8}}},
+        {t:"Ser su intérprete oficial toda la noche", out:{r:"Asumes el cargo entero: tú hablas con los camareros, tú pides los taxis, tú le contestas al segurata. Pocho, liberado de todo trato con el exterior, se dedica exclusivamente a los chaveas y alcanza cotas históricas: monta un brindis, imita a Juanjo gesticulando, saca un chupito de la nada.\n\nEl Turko lo resume mirándoos: «Le has puesto portavoz. Así rinde el doble.»\n\nHas descubierto solo cómo funciona el mediocentro a estas horas: por dentro, todo. Por fuera, nada.", fx:{resp:+13, din:-12}}},
+        {t:"Reírte y decirle «Pocho, es un camarero, tío»", out:{r:"Se te escapa la risa y se lo dices en voz alta delante de todos. Pocho te mira MUY fijamente, con una dignidad enorme, y responde:\n\n«Yo con los míos hablo lo que hay que hablar.»\n\nSilencio de un segundo... y la carcajada del grupo entero, incluida la suya, porque es exactamente lo que pasa y todos lo saben. La frase queda para la historia.\n\nPero Faé no lo deja ahí: durante la siguiente media hora anuncia a cada camarero que se cruza que «este señor no habla con extraños». Pocho te lo apuntará en la cuenta.", fx:{resp:+8, din:-15, dig:-4}}}
+      ]},
+    {ch:"turko", text:"Una de la mañana. La pista está al máximo: Faé en el centro, Guille en fase terminal, Kike zigzagueando entre la gente. Y en el extremo de la barra, solo, con la espalda apoyada y un cigarro sin encender en la mano, está el Turko. Mirando.\n\nNo está aburrido. Está observando el local entero como observa un edificio: los flujos, los cuellos de botella, por dónde entra la gente y por dónde debería salir.\n\nTe ve llegar y, sin dejar de mirar la pista, comenta: «Esta discoteca está mal diseñada, chavea.»",
+      opts:[
+        {t:"«¿Mal diseñada? Explica.»", out:{r:"Y te lo explica. Diez minutos de análisis arquitectónico impecable a la una de la mañana: la barra estrangula el paso, los baños están en el peor sitio posible, el reservado rompe la circulación. Todo cierto. Todo verificable mirando.\n\nCuando termina, señala a los chaveas con el cigarro: «Y sin embargo mira. Funciona. Porque el sitio lo hace la gente, no el arquitecto.»\n\nEs la mejor frase de la noche y la ha dicho el que menos habla.", fx:{resp:+11}}},
+        {t:"Quedarte con él en la barra un rato", out:{r:"Te apoyas a su lado y os quedáis los dos viendo el espectáculo sin participar: Faé subiéndose a algo, Guille abrazando a un desconocido, De la Puente apareciendo de la nada.\n\nEl Turko te pasa el cigarro sin decir nada. «Desde aquí se ve mejor», comenta.\n\nY tiene razón. Diez minutos de recuperación táctica en el mejor asiento del local, en compañía del único que va a llegar entero al amanecer.", fx:{resp:+8, ene:+10}}},
+        {t:"Arrastrarle a la pista con los demás", roll:{stat:"ene", dc:75, ok:{r:"Le quitas el cigarro, le coges del brazo y lo metes en el corro. Y ocurre lo que no ocurre nunca: EL TURKO BAILA. Cuatro canciones. Con su sonrisa serena intacta, sin perder el ritmo ni el aliento, como si también esto lo tuviera calculado.\n\nLos chaveas alucinan. Salme lo graba. «Llevo doce años intentándolo», dice Juanjo, gesticulando su propia derrota. «Doce años.»", fx:{resp:+14, ene:-10}}, ko:{r:"Tiras de su brazo y el Turko no se mueve. No se resiste: simplemente NO SE MUEVE, como un pilar de carga. Te mira con infinita paciencia.\n\n«Chavea. Yo entro a la pista cuando quedan cuatro. Ese es mi turno.»\n\nY así será: a las seis de la mañana, cuando ya no quede casi nadie, el Turko bailará. Pero eso no lo verás hasta el final.", fx:{resp:+3, ene:-6}}}}
+      ]}
+  ]
+},
+/* ---------- FASE 5: EL AFTER ---------- */
+{
+  name:"LA VUELTA", clock:"04:30 · Hasta que el cuerpo aguante", pick:3, drift:{alc:+5, ene:-15, din:-10},
+  tag:"No hay after. Hay el mismo circuito otra vez, andando, hasta que amanezca.",
+  intro:{ch:"grupo", text:"El Green cierra y os escupe a la calle. Recuento de bajas: Kike enviando audios INTELIGIBLES (fenómeno inexplicable a estas horas), Guille en fase cariñosa terminal abrazado a Faé, que aún conserva la trompeta, y el Turko fresco como si fueran las cinco DE LA TARDE.\n\nAlguien insinúa tímidamente la palabra «casa». Y entonces habla el hombre que jamás ha pronunciado esa palabra, ya con los brazos abiertos otra vez:\n\n«¿Casa? Nos volvemos andando a La Casona, que a esta hora seguro que sigue abierto. Y si no, damos la vuelta y vemos.»\n\nY ahí está el secreto que nadie le cuenta a los aspirantes: el after no existe. Nunca ha existido. El after es esto — volver a pie por donde habéis venido, deshacer el circuito de Kike al revés, entrar donde haya luz encendida, y seguir.\n\nDe la Puente ya ha arrancado. «Pochín pochín pochín», canturrea agarrando a Pocho del brazo. Y Pocho, que jamás dice que no, se deja llevar con una copa en cada mano que nadie le ha pedido.\n\nEsta es la frontera. Lo que separa un buen intento de un CHAVEA DAY completo.",
+    opts:[
+      {t:"«Hasta que el cuerpo aguante. Vamos.»", out:{r:"De la Puente pega un grito que despierta a un barrio entero y te abraza por decimoquinta vez en el día. «¡¡EL CHAVEÍTA SE VIENE!!»\n\nPocho, sin decir nada, te pone en la mano una de las dos copas que llevaba. Estaba destinada a ti desde el principio: él ya sabía que ibas a seguir.\n\nLos supervivientes forman la última columna de marcha. Esto ya no es una fiesta: es una peregrinación a pie.", fx:{resp:+10, ene:-8, alc:+6}}},
+      {t:"«¿Volver? Pero si acabamos de salir de ahí.»", out:{r:"«Exacto», dice De la Puente sin el menor complejo, como si eso lo explicara todo. Y en cierto modo lo explica.\n\nEl Turko lo remata desde su nube: «A estas horas no se elige el SITIO, chavea. Se elige SEGUIR.» Es lo más sabio que se ha dicho en toda la noche y lo ha provocado el más sinvergüenza. Faé levanta la trompeta. La democracia ha hablado.", fx:{resp:+4, alc:+6, ene:-5}}}
+    ]},
+  pool:[
+    {ch:"kike", text:"Kike anuncia su retirada: «Yo... me voy yendo.» Señal universal de peligro: son 20 minutos andando hasta su casa y su trayectoria actual, evaluada científicamente, es un zigzag con deriva de babor. Además ha mencionado tres veces que el Land Rover «está aquí al lado», lo cual DEBE ser impedido a toda costa.",
+      opts:[
+        {t:"Escoltarlo a casa personalmente", out:{r:"Veinte minutos de escolta nocturna en los que Kike alterna silencios, confesiones ininteligibles y UNA llamada entrante (a las cinco de la mañana; el misterio se agranda) que atiende hablando perfectamente otra vez. Lo entregas en su portal. «Ereh... grande», te dice. Vuelves con el grupo y todos conocen ya tu gesta: la escolta puntúa DOBLE porque nadie la pide y todos la valoran.", fx:{resp:+13, ene:-12}}},
+        {t:"Confiscarle las llaves del Land Rover primero", out:{r:"Operación delicadísima: separar a un típico tío tío de sus llaves es como desarmar una bomba. Lo consigues mediante el truco más viejo del mundo («déjame ver el llavero, qué chulo») y se las entregas a Pocho, custodio oficial de cosas confiscadas. Kike se va andando, más seguro él y más seguro el mundo. Responsabilidad nivel chavea: demostrada.", fx:{resp:+10, dig:+3}}},
+        {t:"Pedirle un taxi y despedirlo con honores", out:{r:"Solución logística limpia: taxi, dirección confirmada dos veces con el taxista (Kike la pronuncia mal las dos), y despedida con honores militares de todo el grupo desde la acera. Cumplidor y eficaz, aunque la leyenda dice que la escolta a pie vale más. Aún así: gesto anotado.", fx:{resp:+6, din:-8}}}
+      ]},
+    {ch:"amigo", text:"Seis de la mañana. Y ahí sigue el amigo de Pocho, el que hace ocho horas no existía para ninguno de vosotros y cuyo nombre sigue sin saber nadie.\n\nNo solo sigue: está EN EL NÚCLEO. Lleva la trompeta de Faé colgada del cuello. Ha aprendido a decir «pochín pochín pochín». Guille le ha contado su vida. Y ahora se gira hacia ti, el aspirante, y con una confianza absoluta te suelta:\n\n«Chaveíta, ¿tú vienes todos los años?»\n\nSe cree veterano. LLEVA OCHO HORAS. Y lo peor es que, viéndolo, casi le das la razón.",
+      opts:[
+        {t:"«Es mi primer año. ¿Y tú?»", out:{r:"«Yo también», dice tranquilamente. «Pero yo ya me siento de aquí.»\n\nY tiene razón. La tiene. Miras alrededor y el tío está integrado a un nivel que a ti te ha costado dieciséis horas de guerra. El Turko, que lo ha oído todo, comenta desde su nube: «Los amigos de Pocho entran por la puerta de atrás. Siempre.»\n\nDecides que en vez de envidiarlo vas a aprender de él. Y brindas con él.", fx:{resp:+9, alc:+6}}},
+        {t:"«Llevas ocho horas, no te vengas arriba.»", out:{r:"Se ríe sin ofenderse lo más mínimo —los personajes de novela de ficción no se ofenden nunca— y te contesta: «Ocho horas BUENAS.»\n\nFaé, que pasaba por ahí, lo escucha y lo consagra al instante: «¡OCHO HORAS BUENAS! ¡ESO ES!» La frase se corea. Y así, sin querer, has provocado tú la entrada oficial del amigo de Pocho en la mitología del grupo. Pocho te lo agradece con un asentimiento.", fx:{resp:+11, alc:+5}}},
+        {t:"Preguntarle a qué se dedica realmente", out:{r:"Craso error de novato: NUNCA se le pregunta a un amigo de Pocho a qué se dedica. La respuesta dura once minutos, incluye tres sectores distintos, un juicio pendiente y una temporada en Andorra, y al terminar sabes menos que al empezar.\n\nPocho, desde detrás, disfrutando: «Te lo dije. Novela de ficción.»", fx:{resp:+4, ene:-6, alc:+5}}}
+      ]},
+    {ch:"kike", text:"Kike ha decidido, unilateralmente y contra toda evidencia médica, que hay que RECENAR. Son las cinco de la mañana. Nadie más quiere recenar. Nadie. El grupo entero se lo dice.\n\nÉl ya ha pedido: unas bravas de dudosa procedencia y un plato enorme de patatas fritas que nadie va a tocar.\n\nLo que ocurre a continuación era previsible: como nadie le sigue la recena, Kike empieza a lanzar patatas fritas. Al Turko. A Faé. A Pocho. Y entonces se gira hacia ti con una patata entre los dedos y esa sonrisa de doble cara.",
+      opts:[
+        {t:"Devolvérsela con una brava a la frente", roll:{stat:"ene", dc:65, ok:{r:"Tiro parabólico perfecto. IMPACTO EN LA FRENTE. La Casona entera enmudece medio segundo y luego estalla. Kike se lleva la mano a la cara, incrédulo: «Me ha dado. ME HA DADO.» Se declara la guerra oficial y en tres minutos el suelo es un campo de patatas. Os echan. Merece la pena.", fx:{resp:+13, ene:-8, din:-8}}, ko:{r:"Fallas por medio metro y le das a un señor que dormitaba en la barra. El señor se despierta, mira la brava, la coge, y se la come. Kike lo señala llorando de risa. La guerra se cancela por absurdo sobrevenido. Sales trasquilado pero con una anécdota que se contará durante años.", fx:{resp:+7, dig:-6, ene:-5}}}},
+        {t:"Sentarte y recenar CON él, aunque no te apetezca", out:{r:"Te sientas y coges una patata. Kike se queda parado, con la munición en la mano. «...¿Vas a recenar?» — «Voy a recenar.» Deja las patatas en el plato. Nadie ha recenado con Kike en diecisiete años de Chavea Days. NADIE.\n\nCome en silencio, emocionado, y a mitad del plato te dice: «Eres el primero.» El grupo lo comenta el resto de la noche. Es la mayor conquista social del día.", fx:{resp:+15, ene:+8, din:-10}}},
+        {t:"Esquivarla y esconderte detrás del Turko", out:{r:"Usas al Turko de escudo humano, que es el único que aguanta un impacto de patata sin inmutarse ni dejar de fumar. Recibe tres seguidas en el hombro con estoicismo arquitectónico. «Chavea», dice sin girarse, «me estás usando de parapeto.» — «Sí.» — «Vale.» Y sigue fumando. Cero puntos por valentía, cinco por astucia.", fx:{resp:+3, ene:-3}}}
+      ]},
+    {ch:"juanjo", text:"Juanjo cojea. Nadie sabe de qué, no ha habido naranjos esta vez, pero cojea: es su tradición. Te mira, mira su pierna, te vuelve a mirar, y pronuncia las palabras rituales que una vez pronunció ante Pocho en el campo:\n\n«Chavea... hazme de bastón.»",
+      opts:[
+        {t:"Ofrecerle el hombro: bastón humano oficial", out:{r:"Asumes el cargo con la solemnidad que merece. Juanjo se apoya y camina a tu lado los ochocientos metros más lentos y más importantes de tu candidatura, contándote entre suspiros la historia COMPLETA del naranjo original, con detalles nuevos que ni Pocho conocía.\n\nAl llegar, sentencia ante todos: «Sabe de bastones. Y el que sabe de bastones... sabe de amistad.» Es el respaldo oficial del miembro de mayor aguante del grupo.", fx:{resp:+12, ene:-10}}},
+        {t:"«¿Qué te has hecho ahora, si no hay naranjos?»", out:{r:"«El cuerpo recuerda, chavea», responde con gravedad de oráculo. «Cada Chavea Day, la pierna me avisa. Es mi naranjo fantasma.» Lo acompaña con el gesto exacto de un naranjo, por si acaso.\n\nEs absurdo, es poético y probablemente sea verdad. Le haces de bastón igual, porque a estas alturas ya sabes cómo funciona esto.", fx:{resp:+8, ene:-8}}}
+      ]},
+    {ch:"guille", text:"Seis menos cuarto de la mañana, andando por la calle. Y ocurre lo que ocurre siempre al final: el cable se DESCRUZA.\n\nGuille, que hace dos horas era una fuerza de la naturaleza, camina ahora a tu lado tranquilo, con las manos en los bolsillos, y de pronto dice, con una lucidez perfecta y sin arrastrar una sola sílaba:\n\n«Qué bien nos lo hemos pasado hoy, ¿no?»\n\nHa vuelto el ingeniero. Analítico, sereno, educado. Como si no hubiera pasado nada. Nunca recuerda casi nada de la parte del medio.",
+      opts:[
+        {t:"«Muy bien. Y tú has estado espectacular.»", out:{r:"Guille frunce el ceño con auténtica curiosidad científica: «¿Yo? ¿Qué he hecho?»\n\nY se lo cuentas: la columna, el abrazo, la coreografía, la teoría de la servilleta. Lo escucha como quien oye hablar de un desconocido, asintiendo educadamente, y al final concluye:\n\n«Pues suena divertido.» Pausa. «¿Y he sido simpático?» — «Muchísimo.» — «Ah, bueno. Entonces bien.»", fx:{resp:+11}}},
+        {t:"Contarle lo del cable y que le llaman el Loko", out:{r:"Se lo explicas con cuidado. Guille lo procesa con la seriedad de un informe técnico y luego pregunta lo más razonable del mundo:\n\n«¿Y por qué nadie me lo dice EN el momento?»\n\n«Porque en el momento no atiendes a razones, Guille.» Se queda pensando. «...Tiene lógica.»\n\nY así, a las seis de la mañana, el Loko acepta un diagnóstico técnico sobre sí mismo con total deportividad. Es entrañable y perfectamente inútil, porque el año que viene pasará igual.", fx:{resp:+9}}},
+        {t:"«Nada, tío. No has hecho nada raro.»", out:{r:"Mientes por piedad. Guille asiente satisfecho: «Ya, yo hoy he ido poco a poco.»\n\nY se queda tan tranquilo. El problema es que Salme lo ha oído, y Salme JAMÁS deja pasar una: saca el móvil, busca el vídeo y se lo pone.\n\nGuille mira la pantalla en silencio veinte segundos. «...Ah.» El encubrimiento ha durado exactamente lo que tarda Salme en encontrar un archivo.", fx:{resp:+3}}}
+      ]},
+    {ch:"turko", text:"Seis y veinte. Quedáis cuatro en pie y uno de ellos es el Turko, que a estas horas ya no es un hombre sino una institución.\n\nEnciende otro, mira a los supervivientes y hace el recuento en voz alta, como un capataz al final del turno: «Kike en casa. Salme desaparecido. Guille recuperado. Faé sin voz. Juanjo cojo. Pocho tocado.»\n\nSe gira hacia ti y añade: «Y el chavea, en pie.» Da una calada. «No está mal, para ser el primer año.»",
+      opts:[
+        {t:"«¿Y tú, Turko? Tú estás igual que a las dos.»", out:{r:"«Yo apago la luz», responde. Y no es una frase hecha: en veinte años de Chavea Days, el último que se va siempre ha sido él. Es su función y la cumple religiosamente.\n\n«Alguien tiene que quedarse hasta el final para contarlo, chavea. Si no, esto no habría pasado.»\n\nEs el mejor argumento que has oído nunca para no irse a casa.", fx:{resp:+10}}},
+        {t:"«Me quedo contigo hasta el final, entonces.»", out:{r:"El Turko no dice nada. Te ofrece el cigarro. Te lo fumas a medias con él viendo cómo amanece detrás de los edificios que probablemente él te podría criticar uno por uno.\n\nY así, sin ceremonia ninguna, quedáis dos apagando la luz en vez de uno.\n\nAl día siguiente, cuando el grupo repase quién aguantó hasta el final, tu nombre aparecerá al lado del suyo. Eso, en este grupo, es un titular.", fx:{resp:+14, ene:-10}}},
+        {t:"«Yo creo que ya no puedo más, Turko.»", out:{r:"«Pues te vas», dice sin el menor reproche. «Aguantar por obligación no vale nada.»\n\nY te acompaña él mismo a buscar un taxi, tranquilo, sin prisa, como hace todo. Antes de cerrarte la puerta: «Has hecho un día muy digno, chavea.»\n\nViniendo del hombre que nunca exagera, «digno» es casi una medalla. Pero te has perdido el amanecer, y el amanecer es donde se decide todo.", fx:{resp:+4, ene:+12, din:-10}}}
+      ]},
+    {ch:"salme", text:"Salme reaparece. Nadie sabe de dónde. Nadie le pregunta, porque son las seis y media de la mañana y ya nadie tiene energía para el expediente Salme.\n\nLlega tan tranquilo, sin explicar nada, y lo primero que hace es sacar el móvil y ponerse a repasar las stories de la noche una por una, comentando la jugada de cada foto como si fuera un análisis post-partido.\n\n«Mira esta. Mira. Aquí ya se te veía tocado, chavea.»\n\nY ahí está su verdadero don: no llevarse a nadie a casa. NARRARLO todo después.",
+      opts:[
+        {t:"Repasar la noche entera con él, foto por foto", out:{r:"Os sentáis en un bordillo y hacéis la crónica completa: la bandera, la trompeta, el zigzag de Kike, el abrazo de Guille, el ácido de Juanjo. Salme comenta cada momento con precisión de comentarista deportivo.\n\nY entiendes por fin cuál es su papel en el grupo: alguien tiene que ser la MEMORIA. Los demás lo viven; él lo archiva.\n\n«Sin mí no os acordaríais de nada», dice. Y es literalmente cierto.", fx:{resp:+11, ene:-4}}},
+        {t:"«Salme. ¿De dónde vienes?»", out:{r:"Levanta la vista del móvil, te mira con absoluta serenidad y responde:\n\n«De por ahí.»\n\nY vuelve al móvil. Fin del interrogatorio. Llevan quince años sacándole exactamente esa misma respuesta y ya lo han aceptado como una constante física del universo.", fx:{resp:+5}}},
+        {t:"Pedirle que te mande todas las fotos tuyas", out:{r:"«Hecho», dice, y te las manda ahí mismo. Cuarenta y una fotos y siete vídeos.\n\nLuego añade algo que no esperabas: «Te he ido haciendo fotos toda la noche, chavea. Como a uno más.»\n\nTe quedas con eso. Llevaba dieciséis horas documentándote como si ya fueras del grupo, mucho antes de que nadie hubiera votado nada.", fx:{resp:+12}}}
+      ]},
+    {ch:"puente", text:"La Casona sigue abierta, como De la Puente había predicho. Dentro, los Albertos y Pocho han formado un triángulo de retroalimentación en la barra. Cada vez que alguien insinúa la retirada, uno de los tres dice «UNA MÁS» y los otros dos lo celebran como si fuera una idea nueva. Llevan así cuarenta minutos. Pocho está más cariñoso que nunca, señal inequívoca de que las «trampas» se han ido gastando. Esto podría no acabar NUNCA.",
+      opts:[
+        {t:"Sumarte al triángulo: «¡UNA MÁS!»", roll:{stat:"alc", dc:88, ok:{r:"Entras en el triángulo y ABSORBES SU ENERGÍA en lugar de ser absorbido: propones la ronda, la sirves, la brindas, y sigues en pie. Los Albertos te miran como a un igual. Pocho, emocionado y cariñosísimo, te declara «cuadrado» honorífico: el triángulo ahora tiene cuatro lados. La geometría llora. El grupo aplaude.", fx:{resp:+13, alc:+15, ene:-10}}, ko:{r:"El triángulo es una trituradora de aspirantes: a la segunda «UNA MÁS» tu cuerpo emite un comunicado oficial de cierre. Te descubres sentado en un taburete mirando fijamente un cartel de neón durante lo que podrían ser diez minutos o una hora. Alberto de la Puente te reanima con una palmada: «¡El chaval lo ha INTENTADO!» En este grupo, intentarlo puntúa. Sobrevivirlo, más.", fx:{resp:+5, alc:+20, ene:-18, dig:-6}}}},
+        {t:"Sabotear el bucle: «Última y nos vamos a por churros»", out:{r:"Pronuncias la única palabra capaz de romper el triángulo: CHURROS. Los tres se detienen a la vez, como si hubieras dicho la contraseña ancestral. «...Churros», repite Alberto de la Puente con la mirada perdida. «CHURROS», confirma Pocho. El bucle colapsa hacia el desayuno. Acabas de salvar vidas y no lo saben.", fx:{resp:+9, alc:+7}}},
+        {t:"Traerles tres vasos de agua sin avisar", out:{r:"Vuelves de la barra con tres vasos de agua y los plantas en medio del triángulo.\n\nSilencio. Los tres los miran como si acabaras de traer fuego a la cueva. Y se los beben. DE UN TRAGO. Los tres. Con los ojos cerrados y un «uffff» final al unísono que se oye desde la puerta.\n\n«El agua», dice Alberto de la Puente, tocado por la revelación. «EL AGUA, chaveíta.»\n\nY entonces, restaurados, cada uno pide un chupito y se lo bebe encima. Porque el agua aquí no frena nada: el agua REPARA. Acabas de alargarles la noche dos horas y te lo agradecen como si les hubieras salvado la vida. Que en cierto modo es lo que has hecho.", fx:{resp:+15, din:-10, ene:+10, alc:+8}}},
+        {t:"Observar desde la barra tomando notas mentales", out:{r:"Documentas el fenómeno a distancia prudencial, como un naturalista. El Turko se te une en el estudio: «Llevan así desde 2011», comenta. «Una vez los dejamos solos y amanecieron en Portugal.» No sabes si es broma. Por cómo lo dice, NO es broma.", fx:{alc:+6, resp:+3}}}
+      ]},
+    {ch:"fae", text:"Faé, que lleva desde las 00:30 siendo el centro de gravedad de cada local que pisáis, sube al taburete de La Casona con la trompeta en la mano. El local entero (vosotros, un camarero y un señor mayor que aplaude todo) lo mira. «Y AHORA... ¡EL SOLO FINAL!»\n\nTe tiende la trompeta: «Conmigo. A dúo. Es tu último examen artístico.»",
+      opts:[
+        {t:"Dúo de trompeta al amanecer", out:{r:"Faé canta la melodía, tú la destrozas con la trompeta, el señor mayor llora de emoción y aplaude de pie. Es objetivamente lo peor que ha sonado nunca en La Casona, que ya es decir, y a la vez es PERFECTO. Faé te abraza: «Los grandes dúos de la historia empezaron así, chavea. Así EXACTAMENTE.»", fx:{resp:+11, dig:-7, ene:-5}}},
+        {t:"Hacerle los coros con palmas flamencas", out:{r:"Decisión sabia: le cedes el solo y le pones el compás. Faé, con acompañamiento por primera vez en su carrera trompetística, se crece hasta niveles operísticos. El camarero apaga la música del local PARA ESCUCHARLO, gesto que puede ser homenaje o rendición. Cierra con reverencia y te señala: «¡MI BANDA!»", fx:{resp:+8, ene:-4}}}
+      ]}
+  ],
+  outro:{ch:"grupo", text:"07:40. La luz del amanecer os encuentra en la churrería de siempre: la mesa del fondo, los supervivientes, más raciones de churros de las que nadie va a comerse y un silencio nuevo, espeso, casi litúrgico.\n\nPocho moja un churro, te mira, y dice las palabras que llevas todo el día esperando: «Bueno, chavea... es la hora. Di tus últimas palabras antes del veredicto.»",
+    opts:[
+      {t:"«Ha sido el mejor día de mi vida. Y quiero el del año que viene.»", out:{r:"Los supervivientes cruzan miradas. Guille solloza abiertamente (fase cariñosa terminal). El Turko asiente con el churro. Faé toca una nota larga y solemne de trompeta que el churrero tolera porque a estas horas ya todo da igual.\n\nPocho sonríe despacio. «Buenas palabras. A deliberar.»", fx:{resp:+8}}},
+      {t:"No decir nada. Pagar los churros de todos.", out:{r:"Te levantas en silencio, vas a la barra y pagas la cuenta entera. Vuelves y te sientas sin mencionar nada.\n\nLo notan al pedir la cuenta. Silencio. Miradas. Pocho deja el churro a medio mojar: «...El chavea ha pagado los churros.» En el idioma de este grupo, eso es un discurso de tres horas. Guille llora. Otra vez.", fx:{resp:+12, din:-20}}},
+      {t:"«¿Últimas palabras? UNA MÁS.»", out:{r:"Se hace un silencio... y Alberto de la Puente se levanta ARRASTRANDO LA SILLA con los ojos encendidos: «¡¡ESO ES!! ¡¡LO QUE YO DECÍA!!» Pocho tiene que sujetarlo físicamente para que no reabra la noche desde la churrería.\n\n«Chavea», dice Pocho, mitad riéndose mitad agotado, «has dicho la frase sagrada en el lugar sagrado. Eso es de nota... aunque casi nos cuesta otra hora de fiesta.»", fx:{resp:+10, alc:+4}}}
+    ]}
+}
+];
+
+/* ================= HUD ================= */
+function clamp(k,v){ return Math.max(0, Math.min(LIM[k], v)); }
+function applyFx(fx){
+  const parts=[];
+  for(const k of ["alc","dig","ene","din","resp"]){
+    if(fx && fx[k]){
+      let v = fx[k];
+      if(k==='resp' && v>0) v = Math.max(1, Math.round(v*0.55)); // el respeto se gana caro
+      S[k]=clamp(k, S[k]+v);
+      const name={alc:"🍺",dig:"🎩",ene:"⚡",din:"💶",resp:"👑"}[k];
+      parts.push(`<span class="${v>0?'up':'down'}">${name} ${v>0?'+':''}${v}</span>`);
+    }
+  }
+  updateHUD();
+  return parts.length?`<div class="fx">${parts.join('')}</div>`:'';
+}
+function barColor(k,v){
+  if(k==='alc') return v>75?'var(--red)':v>45?'var(--gold)':'var(--green)';
+  return v<25?'var(--red)':v<50?'var(--gold)':'var(--green)';
+}
+function updateHUD(){
+  for(const k of ["alc","dig","ene","din","resp"]){
+    const pct = Math.round(100*S[k]/LIM[k]);
+    $('b-'+k).style.width=pct+'%';
+    $('b-'+k).style.background = k==='resp'?'linear-gradient(90deg,var(--purple),var(--gold))':barColor(k,pct);
+    $('v-'+k).textContent = k==='din'? S[k]+'€' : Math.round(S[k]);
+  }
+}
+
+/* ================= MUERTES ================= */
+function checkKO(){
+  if(S.alc>=LIM.alc) return {icon:"🚑", title:"K.O. ETÍLICO", text:"El mundo gira. Las luces se funden en una sola. Lo último que recuerdas es a Pocho sujetándote la cabeza con una ternura inesperada mientras Juanjo, veterano en estas lides, te tapa con su chaqueta.\n\nTe despiertas en un sofá desconocido con un zumo, un ibuprofeno y una nota: «Se intentó. Nos vemos el año que viene. — Los Chaveas».\n\nHas caído con honor, pero has caído."};
+  if(S.dig<=0) return {icon:"📱", title:"MUERTE POR VERGÜENZA", text:"Ha ocurrido algo tan lamentable que ni los chaveas —expertos mundiales en el ridículo ajeno y propio— pueden mirarte a los ojos.\n\nEl vídeo ya está en el grupo de WhatsApp. Tiene tres respuestas: un «JAJAJAJAJA» de Salme, un audio de 4 minutos de Faé y un escueto «buah» de Kike, que es lo peor de todo.\n\nSerás leyenda, pero no serás chavea."};
+  if(S.ene<=0) return {icon:"😴", title:"EL CUERPO NO AGUANTÓ", text:"Te has quedado dormido. Delante de todos. En pleno Chavea Day.\n\nTe despiertas con un bigote pintado con corcho quemado, la firma de todos los presentes en el brazo y 47 fotos tuyas en posturas cada vez más creativas.\n\nLa regla era una: hasta que el cuerpo aguante. El tuyo no aguantó."};
+  if(S.din<=0) return {icon:"💸", title:"BANCARROTA FESTIVA", text:"Te palpas los bolsillos. Nada. Ni para el bus.\n\nPocho, sin decir palabra, te paga la última copa. Y eso, amigo, es lo peor que te puede pasar: ahora le debes una copa a Pocho, y las deudas con Pocho se pagan en Chavea Days.\n\nTe mandan a casa con dinero prestado para el taxi. Volverás, pero con la lección aprendida: al Chavea Day se viene llorado y con efectivo."};
+  return null;
+}
+
+/* ================= RENDER ================= */
+function stage(html){ $('stage').innerHTML = `<div class="card">${html}</div>`; window.scrollTo({top:0,behavior:'smooth'}); }
+
+function showIntro(){
+  $('hud').style.display='none';
+  $('stage').innerHTML = `<div class="card" id="intro">
+    <div class="scene-text">Hay un día sagrado al año. Comida, vino, cervezas, copas, chupitos y alguna que <i>«otra cosa»</i> más. Empieza a las dos de la tarde y termina cuando el cuerpo dice basta.\n\nSe llama <b style="color:var(--gold)">CHAVEA DAY</b>.\n\nHoy, por primera vez, has sido invitado. No como chavea. Como <b>aspirante</b>. Si al amanecer los chaveas te consideran digno, entrarás en el grupo. Si no... siempre te quedará el recuerdo.\n\nEstos son tus jueces:</div>
+    <div class="roster">
+      <div class="r">🍬 <b>Juanjo «Golosina»</b> — Aguante de titanio, ácido traicionero. Vomitó las cortinas de una discoteca en rojo Rioja.</div>
+      <div class="r">😈 <b>Enrique «Kike» Hernández</b> — Ingeniero del zigzag. Recibe llamadas que nadie sabe de quién son. Tiene Land Rover, moto, barco... siempre para llevar rubias en él.</div>
+      <div class="r">⚓ <b>Salme «Perubian»</b> — Capitán de escuela náutica y del Instagram. Una vez se llevó a casa a un grupo de 3 y la ciencia aún lo estudia.</div>
+      <div class="r">🔩 <b>Guille «El Loko»</b> — Ingeniero. Analítico. Tranquilo. Hasta que ya no. Y cuando no... LOKURA.</div>
+      <div class="r">🌿 <b>El Turko Macías</b> — Arquitecto. Fuma y bebe lo que quiera y siempre va «relativamente bien». Recoge el último.</div>
+      <div class="r">🎺 <b>Faé Andrade</b> — Centro de gravedad de toda fiesta. Nos echaron de una discoteca por su culpa. Mereció la pena.</div>
+      <div class="r">🎩 <b>Pocho</b> — El mediocentro. Perfil bajo, chupitos altos. Portador oficial de las «trampas».</div>
+      <div class="r">🏃🤸 <b>Los Albertos</b> — Refuerzos no confirmados. Si aparecen, la noche cambia de categoría.</div>
+    </div>
+    <div class="scene-text">Reglas: vigila tu <b>alcohol</b> (si llega al máximo, K.O.), tu <b>dignidad</b> y tu <b>energía</b> (si llegan a cero, fin), y tu <b>dinero</b>. Gana <b style="color:var(--gold)">Respeto Chavea 👑</b> para ser aceptado al amanecer.</div>
+    <div class="small">Los eventos son aleatorios: cada partida es un Chavea Day distinto.</div>
+    <div class="choices"><button class="next" onclick="startGame()">🍽️ SON LAS 14:00 — EMPIEZA EL CHAVEA DAY</button></div>
+  </div>`;
+}
+
+function startGame(){
+  Object.assign(S,{alc:0,dig:100,ene:100,din:140,resp:10});
+  amigo = rnd(AMIGOS);
+  vistos = {};
+  phaseIdx=0; $('hud').style.display='block'; updateHUD();
+  startPhase();
+}
+
+function startPhase(){
+  const P = PHASES[phaseIdx];
+  applyFx(P.drift||null);
+  const ko = checkKO(); if(ko) return showEnding(ko);
+  $('phasename').textContent = P.name; $('clock').textContent = P.clock;
+  queue = [P.intro, ...pickFair(P.pool, P.pick)];
+  if(P.outro) queue.push(P.outro);
+  sceneIdx = 0;
+  stage(`<div class="phase-title"><div class="clock">${P.clock}</div><h2>${P.name}</h2><p>${P.tag}</p></div>
+    <div class="choices"><button class="next" onclick="nextScene()">Adelante →</button></div>`);
+}
+
+function nextScene(){
+  const ko = checkKO(); if(ko) return showEnding(ko);
+  if(sceneIdx >= queue.length){
+    phaseIdx++;
+    if(phaseIdx >= PHASES.length) return finalJudgement();
+    return startPhase();
+  }
+  renderScene(queue[sceneIdx++]);
+}
+
+function renderScene(sc){
+  const c = CH[sc.ch]||CH.grupo;
+  const nombre = c.n;
+  let html = `<div class="who"><span class="avatar">${c.a}</span><span class="name">${nombre}</span></div>
+    <div class="scene-text">${T(sc.text)}</div><div class="choices">`;
+  sc.opts.forEach((o,i)=>{
+    if(o.req && !o.req(S)) return;
+    html += `<button class="choice" onclick="pick(${i})">${T(o.t)}</button>`;
+  });
+  html += `</div>`;
+  window._scene = sc;
+  stage(html);
+}
+
+function pick(i){
+  const sc = window._scene, o = sc.opts[i];
+  const c = CH[sc.ch]||CH.grupo;
+  let out, rollNote='';
+  if(o.roll){
+    const statVal = o.roll.stat==='alc' ? Math.max(0, 100 - S.alc*100/LIM.alc) : S[o.roll.stat];
+    const dice = Math.floor(Math.random()*100);
+    const score = dice + statVal*0.6;
+    const ok = score >= o.roll.dc;
+    const statName={alc:"sobriedad",dig:"dignidad",ene:"energía",din:"cartera",resp:"respeto"}[o.roll.stat];
+    rollNote = `<div class="roll-note">🎲 Tirada de ${statName}: ${ok?'✅ ÉXITO':'❌ FALLO'} (${Math.round(score)} vs ${o.roll.dc})</div>`;
+    out = ok ? o.roll.ok : o.roll.ko;
+  } else { out = o.out; }
+  const fxHtml = applyFx(out.fx);
+  const nombre = c.n;
+  let html = `<div class="who"><span class="avatar">${c.a}</span><span class="name">${nombre}</span></div>
+    <div class="result-text">${T(out.r)}</div>${rollNote}${fxHtml}
+    <div class="choices"><button class="next" onclick="nextScene()">Continuar →</button></div>`;
+  stage(html);
+}
+
+/* ================= FINALES ================= */
+function showEnding(e){
+  $('hud').style.display='none';
+  stage(`<div class="ending"><div class="medal">${e.icon}</div><h2>${e.title}</h2>
+    <div class="scene-text">${e.text}</div>
+    <div class="choices" style="margin-top:22px;">
+      <button class="next" onclick="startGame()">🔁 Otro Chavea Day (revancha)</button>
+      <button class="choice" onclick="showIntro()">← Volver al principio</button>
+    </div></div>`);
+}
+
+function finalJudgement(){
+  let e;
+  if(S.resp>=75) e={icon:"👑", title:"CHAVEA DE PLENO DERECHO", text:
+`Amanece. Estáis en los churros. Silencio ceremonial.
+
+Pocho se levanta, alza el último chupito que nadie sabe de dónde ha salido, y mira al resto. Juanjo asiente (y lo acompaña con el gesto de asentir, por si no quedaba claro). El Turko, fresco como una rosa, asiente. Guille te abraza balbuceando algo precioso que nadie entiende. Faé toca la trompeta. Salme lo sube a stories. Kike recibe una llamada, la cuelga: «esto es más importante».
+
+Y entonces De la Puente saca una bolsa de debajo de la silla. Dentro hay una camiseta doblada. LA camiseta: la de fútbol de los chaveas, con su escudo.
+
+«La traíamos por si acaso», dice Pocho. «Casi nunca hace falta sacarla.»
+
+«Chaveas... tenemos uno nuevo.»
+
+Te la pones encima de la ropa sucia de veinte horas de guerra, con la bandera aún colgada en el Green Daila. Has entrado en el grupo. Nos vemos el año que viene. Hasta que el cuerpo aguante.
+
+👑 Respeto final: ${Math.round(S.resp)}/100`};
+  else if(S.resp>=50) e={icon:"🥈", title:"APROBADO... CON CONDICIONES", text:
+`Amanece en los churros. Los chaveas deliberan en voz baja (bueno, Guille en voz altísima).
+
+Veredicto de Pocho: «Se te ve maneras, chavea. Pero esto no se regala.»
+
+Estás oficialmente invitado al Chavea Day del año que viene, donde te juzgarán de nuevo. Juanjo te da un consejo de despedida: «La próxima vez, no mezcles tanto al principio.» Viniendo del hombre que vomitó unas cortinas en rojo Rioja, es oro puro.
+
+👑 Respeto final: ${Math.round(S.resp)}/100`};
+  else e={icon:"🫂", title:"SE TE QUIERE, PERO NO", text:
+`Amanece. Has sobrevivido al Chavea Day entero, que no es poco. Pero sobrevivir no es suficiente: hay que ESTAR.
+
+Los chaveas te despiden con cariño y una ronda de abrazos de Guille (dolorosos). Salme resume el veredicto mientras mira el Instagram: «Buen chaval... pero le falta calle.»
+
+Puedes volver a intentarlo. El Chavea Day siempre vuelve. Una vez al año, sin falta. Como los cumpleaños, pero peor para el hígado.
+
+👑 Respeto final: ${Math.round(S.resp)}/100`};
+  showEnding(e);
+}
+
+showIntro();
+</script>
+</body>
+</html>
