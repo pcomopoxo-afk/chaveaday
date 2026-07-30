@@ -104,8 +104,11 @@
 <script>
 "use strict";
 /* ================= ESTADO ================= */
-const S = { alc:0, dig:100, ene:100, din:140, resp:10 };
-const LIM = { alc:125, dig:100, ene:100, din:250, resp:100 };
+const S = { alc:0, dig:75, ene:100, din:45, resp:10 };
+const LIM = { alc:135, dig:100, ene:100, din:250, resp:100 };
+/* Multiplicadores de dificultad: el Chavea Day no perdona.
+   Se emborracha rápido, se agota rápido, el ridículo pesa y el dinero vuela. */
+const DIF = { alcSube:1.2, eneBaja:1.4, digBaja:2.2, dinBaja:2.0, respSube:0.55 };
 let phaseIdx = 0, queue = [], sceneIdx = 0, log = [], amigo = null;
 /* sustituye la descripción del amigo de Pocho (que nunca tiene nombre) */
 function T(s){ return amigo ? s.replace(/\{AD\}/g, amigo.d) : s; }
@@ -221,7 +224,7 @@ const PHASES = [
 },
 /* ---------- FASE 2: LA SOBREMESA ---------- */
 {
-  name:"LA SOBREMESA", clock:"17:30 · Cafés y verdades", pick:3, drift:{alc:+5, ene:-8, din:-20},
+  name:"LA SOBREMESA", clock:"17:30 · Cafés y verdades", pick:3, drift:{alc:+5, ene:-8, din:-20, dig:-2},
   tag:"La comida terminó hace una hora. Nadie se ha movido. Llegan los cafés y las historias.",
   intro:{ch:"grupo", text:"Los platos han desaparecido y llega el momento litúrgico que precede a todo: LA RONDA DE CAFÉS. Ley no escrita del Chavea Day: aquí nadie pide la primera copa sin su café antes. El café es la bisagra del día: cierra la comida y abre TODO lo demás.\n\nMientras tanto empieza la hora sagrada de las historias: sale lo de Australia, sale la voltereta, sale —cómo no— la noche de las cortinas. Esto es historia oral. Esto es patrimonio.\n\nEl camarero te mira. ¿Qué pides?",
     opts:[
@@ -307,7 +310,7 @@ const PHASES = [
 },
 /* ---------- FASE 3: LAS COPAS ---------- */
 {
-  name:"LAS COPAS", clock:"21:30 · Ruta de bares", pick:3, drift:{alc:+8, ene:-10, din:-15},
+  name:"LAS COPAS", clock:"21:30 · Ruta de bares", pick:3, drift:{alc:+8, ene:-10, din:-15, dig:-3},
   tag:"Green Daila, La Casona, La Loca. El radar de Kike marca el rumbo.",
   intro:{ch:"grupo", text:"Cambio de escenario: bares. Y aquí el mando es de UNO. Kike guarda el móvil (llamada 31 del día, rechazada: esto es más importante) y activa el radar.\n\nPorque Kike SIEMPRE sabe dónde hay gente. Dónde hay ambiente. Dónde hay tías. Nadie sabe cómo lo hace: no consulta nada, no pregunta a nadie. Simplemente LO SABE.\n\n«Nos pasamos primero por el Green Daila, que a estas horas está tranquilo y se puede hablar. Luego La Casona, que hay un cumpleaños de enfermeras. Y de ahí a La Loca, que los sábados a las once explota. Y luego otra vez al Green, ya de noche.»\n\nNadie discute jamás la ruta de Kike. Green Daila de tarde, La Casona, La Loca y Green Daila de noche: ese es el circuito, ha sido siempre ese circuito, y el radar no falla.",
     opts:[
@@ -363,7 +366,7 @@ const PHASES = [
         {t:"«¿Qué llevas exactamente ahí, Pocho?»", out:{r:"Error de protocolo GRAVE. Pocho se cierra la chaqueta con gesto ofendido: «Las trampas NO SE PREGUNTAN, chavea. Las trampas SE CONFÍAN.» Se aleja hacia Alberto de la Puente, que jamás pregunta nada. Has perdido puntos con el mediocentro, y eso se nota en todo el equipo.", fx:{resp:-7}}},
         {t:"Asentir en silencio como los veteranos", out:{r:"Un asentimiento lento, sin palabras. Pocho lo interpreta como sabiduría y decide que la conversación ha ido perfectamente aunque no haya pasado nada, que es exactamente como funcionan las mejores conversaciones con Pocho a estas horas. Te invita a la siguiente copa.", fx:{resp:+6, alc:+9}}}
       ]},
-    {ch:"puente", text:"Kike levanta la vista del móvil: «Alberto está aparcando.»\n\nY hay que entender lo que significa eso. Los Albertos son refuerzos: unos años vienen a comer y otros no, no lo deciden ni ellos, y cuando aparecen de noche entran con las piernas frescas y ocho horas de ventaja sobre el resto. Este además ha corrido quince kilómetros esta mañana «para hacer hueco», dato que él mismo se encargará de contarte.\n\nLa puerta se abre de golpe y ALBERTO DE LA PUENTE entra con los brazos ya abiertos, antes incluso de haber identificado a nadie. Abraza a Juanjo, abraza al Turko, abraza a Guille, abraza a Faé y abraza a un señor de la barra que no conoce de nada y que se deja.\n\nLocaliza a Salme y el bar entero lo oye: «¡¡NASHOOOOOOO!!»\n\nVe a Pocho y cambia de registro al canturreo hipnótico, agarrándole la cara con las dos manos: «Pochín pochín pochín pochín...»\n\nY entonces te ve a ti. Aspirante desconocido. Brazos abiertos. Viene.",
+    {ch:"puente", text:"Kike levanta la vista del móvil: «Alberto está aparcando.»\n\nY hay que entender lo que significa eso. Los Albertos son refuerzos: unos años vienen a comer y otros no, no lo deciden ni ellos, y cuando aparecen de noche entran con las piernas frescas y ocho horas de ventaja sobre el resto. Este además ha corrido quince kilómetros esta mañana «para hacer hueco», dato que él mismo se encargará de contarte. Lo que no te va a contar, porque no lo cuenta nunca, es que estuvo años haciendo MMA. Eso te lo dirá otro, más tarde, y solo si hace falta.\n\nLa puerta se abre de golpe y ALBERTO DE LA PUENTE entra con los brazos ya abiertos, antes incluso de haber identificado a nadie. Abraza a Juanjo, abraza al Turko, abraza a Guille, abraza a Faé y abraza a un señor de la barra que no conoce de nada y que se deja.\n\nLocaliza a Salme y el bar entero lo oye: «¡¡NASHOOOOOOO!!»\n\nVe a Pocho y cambia de registro al canturreo hipnótico, agarrándole la cara con las dos manos: «Pochín pochín pochín pochín...»\n\nY entonces te ve a ti. Aspirante desconocido. Brazos abiertos. Viene.",
       opts:[
         {t:"Abrirte de brazos y recibir el abrazo entero", out:{r:"Te levanta del suelo. Literalmente. Un hombre que ha corrido quince kilómetros esta mañana tiene una fuerza que no es de este mundo.\n\n«¡EL NUEVO! ¡EL NUEVOOO!», ruge, y automáticamente te bautiza con un diminutivo: a partir de ahora eres «chaveíta chaveíta chaveíta» y responderás a ello el resto de tu vida.\n\nSer nombrado por De la Puente es un sacramento.", fx:{resp:+12, ene:-5, alc:+10}}},
         {t:"Devolvérsela: «¡¡PUENTEEEE!!» a pleno pulmón", out:{r:"Le gritas TÚ primero, con el mismo volumen y la misma vocal alargada. Alberto frena en seco, procesa un segundo... y estalla: «¡¡ESTE CHAVEA ES DE LOS NUESTROS!!»\n\nTe abraza el doble de fuerte y le anuncia al bar entero que hoy invitas tú, cosa que no has dicho en ningún momento. Pero el respeto ganado compensa las rondas.", fx:{resp:+14, alc:+14, din:-15}}},
@@ -403,7 +406,7 @@ const PHASES = [
 },
 /* ---------- FASE 4: LA DISCOTECA ---------- */
 {
-  name:"GREEN DAILA", clock:"00:30 · Zona de cortinas", pick:3, drift:{alc:+8, ene:-12, din:-15},
+  name:"GREEN DAILA", clock:"00:30 · Zona de cortinas", pick:3, drift:{alc:+8, ene:-12, din:-15, dig:-4},
   tag:"Vuelta al Green, pero de noche. Luces, cortinas (peligro histórico) y el grupo en su máximo esplendor.",
   intro:{ch:"grupo", text:"Segunda visita al Green Daila del día, y no se parece en nada a la de la tarde. Ahora hay luces, hay cola y hay volumen. Entráis en formación de cuña, Faé en la punta como mascarón de proa, saludando al segurata como si lo conociera (probablemente lo conoce).\n\nDentro: reservado conseguido por Salme mediante artes desconocidas, Pocho ya de camino a la barra sin que nadie le haya pedido nada, y —lo ves y se te hiela la sangre— CORTINAS. Cortinas rojas, largas, elegantes. El historial de este grupo con las cortinas de discoteca es literalmente lo peor que existe.",
     opts:[
@@ -434,6 +437,13 @@ const PHASES = [
         {t:"Escalar y colgar la bandera en el VIP", roll:{stat:"ene", dc:78, ok:{r:"Te encaramas a la barandilla con una agilidad que ni tú te esperabas, atas la bandera con dos nudos que Salme (capitán náutico) aprueba a gritos desde abajo, y saltas.\n\nLa bandera de los chaveas ondea sobre el VIP de la discoteca. Guille llora. Faé toca el silbato nuevo. Los de la zona VIP, sin entender nada, hacen fotos. Ha entrado en el histórico y estabas TÚ arriba.", fx:{resp:+15, ene:-12, dig:-4}}, ko:{r:"Subes, atas la bandera... y el nudo se deshace en cuanto sueltas. La bandera cae en toda la cara de un tipo del VIP, que se levanta ofendidísimo. Segundos de tensión diplomática hasta que ve el escudo, pregunta qué es, y Faé le suelta una explicación de siete minutos tras la cual el tipo quiere UNA CAMISETA.\n\nCaos gestionado. La bandera acaba colgada. Tú acabas con el codo pelado.", fx:{resp:+7, ene:-15, dig:-8}}}},
         {t:"Colgarla en sitio seguro pero visible", out:{r:"Aplicas criterio: nada de VIP, nada de escaladas. La atas en la barandilla de la escalera principal, por donde pasa TODO el mundo. Visibilidad máxima, riesgo cero.\n\nFaé protesta («¡sin épica!») pero Pocho te respalda: «La bandera tiene que estar colgada AL FINAL de la noche, no arrancada a los diez minutos. El chavea ha pensado.» Y así fue: aguantó hasta el cierre.", fx:{resp:+9, ene:-4}}},
         {t:"«¿Lleváis la bandera SIEMPRE encima?»", out:{r:"Los tres que están cerca te miran como si hubieras preguntado si respiran. «Hombre.» Y ya está. Esa es toda la respuesta que vas a obtener.\n\nFaé se la cuelga él mismo, de cualquier manera, y se cae a los cuatro minutos. Podría haber sido tu momento. La has dejado pasar por preguntar lo obvio.", fx:{resp:-3, alc:+5}}}
+      ]},
+    {ch:"grupo", text:"Un chavea nunca busca una pelea. Pero a veces una pelea encuentra a un chavea.\n\nHa pasado en dos segundos: un roce, una copa derramada, y ahora hay un tío enorme con dos amigos detrás señalando a uno de los tuyos y diciendo cosas que no admiten segunda lectura. El chavea en cuestión, que no ha hecho nada, tiene esa cara de «pero si yo solo estaba aquí» que no ha servido de nada en la historia de la humanidad.\n\nY tienes un problema añadido, mucho más grave que los tres tíos: <b>Guille está a cuatro metros</b>. De espaldas. Sin enterarse todavía.\n\nSi Guille se entera, esto deja de ser una discusión y pasa a ser otra cosa. Otra cosa de las que salen en el periódico local.\n\nTienes unos segundos.",
+      opts:[
+        {t:"Ir a por De la Puente y traerlo sin que Guille lo vea", req:()=>(vistos.puente||0)>0, out:{r:"Lo sacas del grupo con disimulo y le señalas el problema. Alberto suspira como quien tiene que volver a la oficina un domingo, y va.\n\nY entonces ves algo que no esperabas: el hombre que lleva toda la noche gritando y abrazando a desconocidos se planta delante del tío enorme, baja la voz y deja las manos quietas.\n\nNo les amenaza. Ni una sola vez. No hay un «te voy a», ni un «como sigas», ni un paso adelante. Lo que hace es EXPLICÁRSELO. Con calma, casi con pena, como quien le explica un riesgo laboral a alguien que va a subirse a un andamio sin arnés.\n\nQue en una pelea de verdad no controla nada nadie. Que basta un tropiezo y un bordillo. Que él ha visto lo que le pasa a una cabeza contra el suelo. Que hay gente que se muere de esto, de verdad, sin querer matar a nadie, un sábado cualquiera. Y que a partir de ese segundo ya no hay marcha atrás para ninguno de los que están aquí.\n\nNo levanta la voz ni una vez. Y funciona exactamente por eso: los tres entienden a la vez, sin que nadie se lo diga, que el único de los presentes que sabe de lo que está hablando es él.\n\nSe van. Todos. No ha pasado nada. Guille sigue de espaldas, hablándole a una columna.\n\nPocho te mira desde la barra y levanta la copa dos centímetros. Acabas de gestionar la única situación que este grupo se toma en serio.", fx:{resp:+16, ene:-5}}},
+        {t:"Una bromita: dejar al chavea de pringao y zafaros", out:{r:"Te metes en medio riéndote y haces exactamente lo contrario de defenderle: le vendes.\n\n«Perdona, tío, perdona, es que este es tonto. En serio. Míralo. ¿Tú le ves cara de listo?» Le pasas el brazo por el cuello a tu propio chavea y lo exhibes como prueba. «Lleva desde las dos de la tarde. Le hemos traído nosotros, es una responsabilidad.»\n\nY funciona, porque funciona SIEMPRE: nadie pega a un pringado, no da prestigio. El tío enorme resopla, dice algo de que tengáis cuidado y se va.\n\nEl chavea sacrificado te fulmina con la mirada durante media hora. Y luego, ya en la calle, te lo reconoce por lo bajo: «Buena jugada, cabrón.»", fx:{resp:+13, dig:-6}}},
+        {t:"Ponerte delante y encararte tú", out:{r:"Das un paso al frente y sacas pecho.\n\nError. Craso, monumental error. Porque el ruido de eso viaja, y el ruido de eso llega a cuatro metros, y a cuatro metros hay un ingeniero con el cable cruzado que se gira MUY despacio.\n\n«¿Qué pasha aquí?»\n\nLos siguientes cuarenta segundos son un borrón. Aparecen el Turko y Pocho de la nada, uno por cada brazo de Guille. Faé se lleva a los otros hablándoles a gritos de no se sabe qué. Salís todos a la calle en formación de emergencia, empujados por un segurata que ya ha visto suficiente.\n\nNadie ha llegado a tocarse. Pero la noche se ha terminado en ese local. Y ha sido por ti.", fx:{resp:-10, ene:-12, dig:-8}}},
+        {t:"Sacar a Guille de allí antes de hacer nada más", out:{r:"Prioridades. Te olvidas de los tres tíos, vas directo a Guille, le pasas el brazo por el hombro y te lo llevas a la barra hablándole de lo primero que se te ocurre: los cohetes.\n\nFunciona a la perfección. Guille se arranca con una explicación de nueve minutos sobre empuje específico mientras a sus espaldas Pocho y el Turko desactivan el conflicto con dos frases y una invitación.\n\nCuando todo ha pasado, el Turko se acerca y te dice lo mejor que te van a decir en toda la noche:\n\n«Los otros sabíamos apagar el fuego. Tú has sido el único que ha pensado en la gasolina.»", fx:{resp:+15, ene:-6}}}
       ]},
     {ch:"hdez", si:()=>(vistos.hdez||0)>0, text:"Y pasa lo que te avisaron que iba a pasar, exactamente como te avisaron: sin avisar.\n\nEl otro Alberto, que en toda la noche no ha hecho un solo gesto brusco, deja su ron cola en una repisa, se quita la chaqueta con parsimonia de oficinista y se la entrega a un desconocido. Se abre un corro sin que nadie lo pida.\n\nY ejecuta LA VOLTERETA. Rotación completa, recepción limpia, los brazos en V. Una perfección técnica de manual, guardada intacta desde el karate de los ocho años, en el cuerpo de un tío que se cansa subiendo escaleras.\n\nLa discoteca ESTALLA. Él se recoloca la camisa sin haber perdido el aliento, te localiza y te señala:\n\n«AHORA EL NUEVO.»",
       opts:[
@@ -470,7 +480,7 @@ const PHASES = [
 },
 /* ---------- FASE 5: EL AFTER ---------- */
 {
-  name:"LA VUELTA", clock:"04:30 · Hasta que el cuerpo aguante", pick:3, drift:{alc:+5, ene:-15, din:-10},
+  name:"LA VUELTA", clock:"04:30 · Hasta que el cuerpo aguante", pick:3, drift:{alc:+5, ene:-15, din:-10, dig:-5},
   tag:"No hay after. Hay el mismo circuito otra vez, andando, hasta que amanezca.",
   intro:{ch:"grupo", text:"El Green cierra y os escupe a la calle. Recuento de bajas: Kike enviando audios INTELIGIBLES (fenómeno inexplicable a estas horas), Guille en fase cariñosa terminal abrazado a Faé, que aún conserva la trompeta, y el Turko fresco como si fueran las cinco DE LA TARDE.\n\nAlguien insinúa tímidamente la palabra «casa». Y entonces habla el hombre que jamás ha pronunciado esa palabra, ya con los brazos abiertos otra vez:\n\n«¿Casa? Nos volvemos andando a La Casona, que a esta hora seguro que sigue abierto. Y si no, damos la vuelta y vemos.»\n\nY ahí está el secreto que nadie le cuenta a los aspirantes: el after no existe. Nunca ha existido. El after es esto — volver a pie por donde habéis venido, deshacer el circuito de Kike al revés, entrar donde haya luz encendida, y seguir.\n\nDe la Puente ya ha arrancado. «Pochín pochín pochín», canturrea agarrando a Pocho del brazo. Y Pocho, que jamás dice que no, se deja llevar con una copa en cada mano que nadie le ha pedido.\n\nEsta es la frontera. Lo que separa un buen intento de un CHAVEA DAY completo.",
     opts:[
@@ -548,7 +558,11 @@ function applyFx(fx){
   for(const k of ["alc","dig","ene","din","resp"]){
     if(fx && fx[k]){
       let v = fx[k];
-      if(k==='resp' && v>0) v = Math.max(1, Math.round(v*0.55)); // el respeto se gana caro
+      if(k==='resp' && v>0)      v = Math.max(1, Math.round(v*DIF.respSube)); // el respeto se gana caro
+      else if(k==='alc' && v>0)  v = Math.round(v*DIF.alcSube);
+      else if(k==='ene' && v<0)  v = Math.round(v*DIF.eneBaja);
+      else if(k==='dig' && v<0)  v = Math.round(v*DIF.digBaja);
+      else if(k==='din' && v<0)  v = Math.round(v*DIF.dinBaja);
       S[k]=clamp(k, S[k]+v);
       const name={alc:"🍺",dig:"🎩",ene:"⚡",din:"💶",resp:"👑"}[k];
       parts.push(`<span class="${v>0?'up':'down'}">${name} ${v>0?'+':''}${v}</span>`);
@@ -570,12 +584,42 @@ function updateHUD(){
   }
 }
 
+/* ================= MECENAZGO =================
+   Quedarse sin pasta no te elimina: siempre hay un chavea que suelta 50 pavos.
+   Pero cada rescate se paga en respeto, y el precio sube. */
+let rescates = 0;
+const MECENAS = [
+  {ch:"juanjo", r:"Juanjo te ve palpándote los bolsillos con cara de tragedia y lo entiende antes de que digas nada.\n\nSaca un billete de 50 y te lo mete en el bolsillo de la camisa él mismo, con las dos manos, acompañándolo de un gesto amplio que significa «no se hable más».\n\n«Chavea. Al Chavea Day no se viene a hacer cuentas.»"},
+  {ch:"kike", r:"Kike, sin dejar de mirar el móvil, alarga el brazo y te planta 50 euros en la mano.\n\n«Toma.»\n\n«Te lo devuelvo el...»\n\n«Toma.» Y vuelve a lo suyo. Un hombre con tres vehículos no discute de cincuenta euros a estas horas."},
+  {ch:"salme", r:"Salme te ve seco y reacciona con la naturalidad de quien resuelve un problema logístico menor.\n\n«¿Sin pasta? Toma 50. Me lo devuelves cuando te apuntes a un curso de patrón.»\n\nY lo dice medio en broma... pero saca el móvil y te enseña las tarifas. Nunca deja de trabajar. Nunca."},
+  {ch:"guille", r:"Guille se saca del bolsillo un billete de 50 arrugadísimo, lo estira contra la pierna con muchísimo cuidado y te lo entrega como quien entrega un documento importante.\n\n«Esto... esto es PARA TI. Y no me lo devuelvash.» Pausa. «Bueno, sí. Mañana. O nunca.» Otra pausa. «Nunca esh mejor.»"},
+  {ch:"turko", r:"El Turko no pregunta. Ve la situación desde la barra, se acerca, te deja 50 euros en la mano y te lo resume con una calada:\n\n«El dinero se acaba, la noche no. Eso ya lo tenías que saber, chavea.»\n\nY vuelve a su sitio antes de que te dé tiempo a darle las gracias."},
+  {ch:"fae", r:"Faé se entera de que estás sin blanca y, como todo lo suyo, lo convierte en un acto público:\n\n«¡¡SEÑORES!! ¡¡EL ASPIRANTE ESTÁ TIESO!!»\n\nMonta una colecta en treinta segundos, pasando una gorra imaginaria, y te entrega 50 euros con una ceremonia de entrega de trofeo. Todo el bar aplaude. Tú querrías desaparecer, pero tienes 50 pavos."},
+  {ch:"pocho", r:"Pocho aparece a tu lado antes de que te dé tiempo a preocuparte. Ya lo sabía. Lo sabía desde hace media hora.\n\nTe pone 50 euros en la mano cerrándote los dedos encima y te mira muy serio:\n\n«Esto no ha pasado. Y sigue la fiesta.»"}
+];
+function darMecenazgo(sigue){
+  const m = rnd(MECENAS), c = CH[m.ch];
+  rescates++;
+  S.din = clamp('din', S.din + 50);
+  const coste = rescates===1 ? 0 : (rescates===2 ? -4 : -9);
+  const extra = rescates===1
+    ? "\n\nPrimer rescate de la noche. Aquí nadie se queda fuera por dinero."
+    : (rescates===2
+      ? "\n\nSegunda vez que te rescatan hoy. Nadie te dice nada, pero el Turko lo ha visto las dos veces."
+      : "\n\nY van "+rescates+". Ya no es simpático: es un patrón. «Chavea», comenta Salme en voz alta, «¿tú has traído ALGO de casa?»");
+  const fxHtml = coste ? applyFx({resp:coste}) : (updateHUD(),'');
+  stage(`<div class="who"><span class="avatar">${c.a}</span><span class="name">${c.n}</span></div>
+    <div class="scene-text">💶 <b style="color:var(--gold)">TE HAS QUEDADO SIN PASTA</b>\n\n${m.r}${extra}</div>
+    <div class="fx"><span class="up">💶 +50</span></div>${fxHtml}
+    <div class="choices"><button class="next" onclick="${sigue}()">Seguir la fiesta →</button></div>`);
+}
+
 /* ================= MUERTES ================= */
 function checkKO(){
   if(S.alc>=LIM.alc) return {icon:"🚑", title:"K.O. ETÍLICO", text:"El mundo gira. Las luces se funden en una sola. Lo último que recuerdas es a Pocho sujetándote la cabeza con una ternura inesperada mientras Juanjo, veterano en estas lides, te tapa con su chaqueta.\n\nTe despiertas en un sofá desconocido con un zumo, un ibuprofeno y una nota: «Se intentó. Nos vemos el año que viene. — Los Chaveas».\n\nHas caído con honor, pero has caído."};
   if(S.dig<=0) return {icon:"📱", title:"MUERTE POR VERGÜENZA", text:"Ha ocurrido algo tan lamentable que ni los chaveas —expertos mundiales en el ridículo ajeno y propio— pueden mirarte a los ojos.\n\nEl vídeo ya está en el grupo de WhatsApp. Tiene tres respuestas: un «JAJAJAJAJA» de Salme, un audio de 4 minutos de Faé y un escueto «buah» de Kike, que es lo peor de todo.\n\nSerás leyenda, pero no serás chavea."};
   if(S.ene<=0) return {icon:"😴", title:"EL CUERPO NO AGUANTÓ", text:"Te has quedado dormido. Delante de todos. En pleno Chavea Day.\n\nTe despiertas con un bigote pintado con corcho quemado, la firma de todos los presentes en el brazo y 47 fotos tuyas en posturas cada vez más creativas.\n\nLa regla era una: hasta que el cuerpo aguante. El tuyo no aguantó."};
-  if(S.din<=0) return {icon:"💸", title:"BANCARROTA FESTIVA", text:"Te palpas los bolsillos. Nada. Ni para el bus.\n\nPocho, sin decir palabra, te paga la última copa. Y eso, amigo, es lo peor que te puede pasar: ahora le debes una copa a Pocho, y las deudas con Pocho se pagan en Chavea Days.\n\nTe mandan a casa con dinero prestado para el taxi. Volverás, pero con la lección aprendida: al Chavea Day se viene llorado y con efectivo."};
+  /* quedarse sin dinero NO es un final: lo resuelve darMecenazgo() */
   return null;
 }
 
@@ -603,7 +647,8 @@ function showIntro(){
 }
 
 function startGame(){
-  Object.assign(S,{alc:0,dig:100,ene:100,din:140,resp:10});
+  Object.assign(S,{alc:0,dig:75,ene:100,din:45,resp:10});
+  rescates = 0;
   amigo = rnd(AMIGOS);
   vistos = {};
   phaseIdx=0; $('hud').style.display='block'; updateHUD();
@@ -614,6 +659,13 @@ function startPhase(){
   const P = PHASES[phaseIdx];
   applyFx(P.drift||null);
   const ko = checkKO(); if(ko) return showEnding(ko);
+  // si el desgaste de la fase te ha dejado seco, primero pasa el mecenas
+  if(S.din<=0) return darMecenazgo('montarFase');
+  montarFase();
+}
+
+function montarFase(){
+  const P = PHASES[phaseIdx];
   $('phasename').textContent = P.name; $('clock').textContent = P.clock;
   queue = [P.intro, ...pickFair(P.pool, P.pick)];
   if(P.outro) queue.push(P.outro);
@@ -624,6 +676,7 @@ function startPhase(){
 
 function nextScene(){
   const ko = checkKO(); if(ko) return showEnding(ko);
+  if(S.din<=0) return darMecenazgo('nextScene');
   if(sceneIdx >= queue.length){
     phaseIdx++;
     if(phaseIdx >= PHASES.length) return finalJudgement();
