@@ -77,6 +77,40 @@
   #intro .r b{color:var(--gold);}
   .small{color:var(--muted); font-size:.8rem; font-style:italic; margin-top:14px;}
   footer{text-align:center; color:#544a72; font-size:.7rem; font-family:Verdana,sans-serif; margin-top:30px; letter-spacing:1px;}
+
+  /* ===== LOGIN ===== */
+  #loginBox{text-align:center; padding:10px 4px;}
+  #loginBox .userchip{display:flex; align-items:center; gap:10px; justify-content:center; margin:14px 0;
+    font-family:Verdana,sans-serif; font-size:.85rem; color:var(--muted);}
+  #loginBox .userchip img{width:34px; height:34px; border-radius:99px; border:2px solid var(--gold);}
+  .btn-google{
+    display:inline-flex; align-items:center; gap:10px; background:#fff; color:#1a1626;
+    font-family:Verdana,sans-serif; font-weight:bold; font-size:.9rem;
+    border:none; border-radius:10px; padding:12px 22px; cursor:pointer; margin:8px 4px;
+  }
+  .btn-google:hover{background:#f0f0f0;}
+  .btn-guest{
+    display:inline-block; background:transparent; color:var(--muted); border:1px solid var(--border);
+    font-family:Verdana,sans-serif; font-size:.8rem; border-radius:10px; padding:10px 18px;
+    cursor:pointer; margin:8px 4px;
+  }
+  .btn-guest:hover{color:var(--text); border-color:var(--muted);}
+  .login-warn{font-family:Verdana,sans-serif; font-size:.72rem; color:var(--red); margin-top:10px;}
+  .login-note{font-family:Verdana,sans-serif; font-size:.72rem; color:var(--muted); margin-top:14px; line-height:1.5;}
+
+  /* ===== RANKING ===== */
+  .ranking{margin-top:22px; border-top:1px solid var(--border); padding-top:16px;}
+  .ranking h3{color:var(--gold); font-size:1rem; text-align:center; margin-bottom:12px; letter-spacing:1px;
+    font-family:Verdana,sans-serif;}
+  .ranking table{width:100%; border-collapse:collapse; font-family:Verdana,sans-serif; font-size:.78rem;}
+  .ranking td{padding:7px 6px; border-bottom:1px solid var(--card2);}
+  .ranking td:first-child{width:26px; color:var(--muted);}
+  .ranking td:last-child{text-align:right; color:var(--gold); font-weight:bold;}
+  .ranking tr.me{background:rgba(245,197,66,.12); border-radius:8px;}
+  .ranking .rk-user{display:flex; align-items:center; gap:8px;}
+  .ranking .rk-user img{width:22px; height:22px; border-radius:99px;}
+  .ranking .loading{text-align:center; color:var(--muted); font-family:Verdana,sans-serif; font-size:.8rem; padding:10px;}
+  .ranking .yourank{text-align:center; font-family:Verdana,sans-serif; font-size:.75rem; color:var(--muted); margin-top:10px;}
 </style>
 </head>
 <body>
@@ -85,6 +119,8 @@
     <h1>🍷 CHAVEA DAY 🍺</h1>
     <div class="subtitle">Un día al año. Hasta que el cuerpo aguante.</div>
   </header>
+
+  <div id="loginScreen" class="card" style="display:none;"></div>
 
   <div id="hud">
     <div id="phasebar"><span id="phasename"></span><span id="clock"></span></div>
@@ -101,8 +137,168 @@
   <footer>CHAVEA DAY™ · Una vez al año desde tiempos inmemoriales</footer>
 </div>
 
-<script>
+<script type="module">
 "use strict";
+
+/* ================= FIREBASE ================= */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, collection, addDoc, serverTimestamp,
+  query, orderBy, limit, getDocs, increment
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCvS3VzBIHEuuBAUptieNKejiZtcQv9leU",
+  authDomain: "chaveaday-6ec62.firebaseapp.com",
+  projectId: "chaveaday-6ec62",
+  storageBucket: "chaveaday-6ec62.firebasestorage.app",
+  messagingSenderId: "627712068172",
+  appId: "1:627712068172:web:b447de1aa5708fd92602e9"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = getFirestore(fbApp);
+const googleProvider = new GoogleAuthProvider();
+
+const WHITELIST = [
+  "carlosmaciaspv@gmail.com","juanjodionisio97@gmail.com","salmeronoliveros@hotmail.com",
+  "ehc2197@gmail.com","rafa_97a@hotmail.com","guillermo.gvalde@gmail.com","rgfandres@gmail.com"
+];
+
+let currentUser = null;   // usuario de Firebase Auth, o null si es invitado
+let guestMode = false;
+
+function pintarLogin(html){
+  $('loginScreen').style.display = 'block';
+  $('loginScreen').innerHTML = `<div id="loginBox">${html}</div>`;
+}
+
+function mostrarPantallaLogin(errorMsg){
+  pintarLogin(`
+    <div class="scene-text">Para que tu Chaveadex, tus medallas y el ranking se guarden de verdad — y no se pierdan si se borra la caché del móvil — entra con tu cuenta de Google.</div>
+    <button class="btn-google" id="btnGoogle">🔵 Entrar con Google</button><br>
+    <button class="btn-guest" id="btnInvitado">Jugar sin cuenta (no se guarda el progreso)</button>
+    ${errorMsg?`<div class="login-warn">${errorMsg}</div>`:''}
+    <div class="login-note">El acceso está limitado a los chaveas invitados.</div>
+  `);
+  $('btnGoogle').onclick = entrarConGoogle;
+  $('btnInvitado').onclick = ()=>{ guestMode = true; currentUser = null; $('loginScreen').style.display='none'; showIntro(); };
+}
+
+async function entrarConGoogle(){
+  try{
+    const res = await signInWithPopup(auth, googleProvider);
+    const email = (res.user.email||"").toLowerCase();
+    if(!WHITELIST.includes(email)){
+      await signOut(auth);
+      mostrarPantallaLogin("Esa cuenta (" + email + ") no está en la lista de chaveas invitados.");
+      return;
+    }
+    // onAuthStateChanged se encarga del resto
+  }catch(err){
+    mostrarPantallaLogin("No se ha podido iniciar sesión. Inténtalo de nuevo.");
+  }
+}
+
+async function cargarOcrearPerfil(user){
+  const ref = doc(db, "perfiles", user.uid);
+  const snap = await getDoc(ref);
+  if(!snap.exists()){
+    const nuevo = {
+      nombre: user.displayName||"Chavea", email: user.email, foto: user.photoURL||"",
+      partidas: 0, mejorResp: 0, creado: serverTimestamp(), actualizado: serverTimestamp()
+    };
+    await setDoc(ref, nuevo);
+    return nuevo;
+  }
+  return snap.data();
+}
+
+/* Se llama al terminar cada partida: guarda el día, actualiza el perfil y el ranking */
+async function guardarResultadoPartida(finalInfo){
+  if(guestMode || !currentUser) return null;
+  try{
+    const uid = currentUser.uid;
+    // 1) archivar la partida (subcolección "dias")
+    await addDoc(collection(db, "perfiles", uid, "dias"), {
+      fecha: serverTimestamp(),
+      resultado: finalInfo.title,
+      resp: Math.round(S.resp), alc: Math.round(S.alc), dig: Math.round(S.dig),
+      ene: Math.round(S.ene), din: Math.round(S.din),
+      chaveasVistos: vistos, flags: flags
+    });
+    // 2) actualizar el perfil agregado
+    const perfilRef = doc(db, "perfiles", uid);
+    const perfilSnap = await getDoc(perfilRef);
+    const anterior = perfilSnap.exists() ? perfilSnap.data() : {partidas:0, mejorResp:0};
+    const mejorResp = Math.max(anterior.mejorResp||0, Math.round(S.resp));
+    await setDoc(perfilRef, {
+      nombre: currentUser.displayName||"Chavea", email: currentUser.email, foto: currentUser.photoURL||"",
+      partidas: (anterior.partidas||0) + 1, mejorResp, actualizado: serverTimestamp()
+    }, {merge:true});
+    // 3) actualizar el ranking global (una fila por usuario)
+    await setDoc(doc(db, "ranking", uid), {
+      nombre: currentUser.displayName||"Chavea", foto: currentUser.photoURL||"",
+      mejorResp, partidas: (anterior.partidas||0) + 1, actualizado: serverTimestamp()
+    }, {merge:true});
+    return {mejorResp};
+  }catch(err){
+    console.error("No se pudo guardar la partida:", err);
+    return null;
+  }
+}
+
+async function pintarRanking(contenedorId){
+  const cont = $(contenedorId);
+  if(guestMode || !currentUser){
+    cont.innerHTML = `<div class="yourank">Entra con Google para aparecer en el ranking de chaveas.</div>`;
+    return;
+  }
+  try{
+    const q = query(collection(db,"ranking"), orderBy("mejorResp","desc"), limit(10));
+    const snap = await getDocs(q);
+    let filas = '', puesto = 0, tuPuesto = null, dentroDelTop = false;
+    snap.forEach(d=>{
+      puesto++;
+      const r = d.data();
+      const esTu = d.id === currentUser.uid;
+      if(esTu){ tuPuesto = puesto; dentroDelTop = true; }
+      filas += `<tr class="${esTu?'me':''}"><td>${puesto}</td>
+        <td class="rk-user">${r.foto?`<img src="${r.foto}">`:''}${r.nombre}</td>
+        <td>👑 ${r.mejorResp}</td></tr>`;
+    });
+    let extra = '';
+    if(!dentroDelTop){
+      const misSnap = await getDoc(doc(db,"ranking",currentUser.uid));
+      if(misSnap.exists()) extra = `<div class="yourank">Tu mejor Respeto Chavea: 👑 ${misSnap.data().mejorResp} (fuera del top 10)</div>`;
+    }
+    cont.innerHTML = `<h3>👑 RANKING DE CHAVEAS</h3><table>${filas}</table>${extra}`;
+  }catch(err){
+    cont.innerHTML = `<div class="yourank">No se ha podido cargar el ranking ahora mismo.</div>`;
+  }
+}
+
+/* Arranca la app: escucha el estado de sesión y decide qué pantalla mostrar */
+onAuthStateChanged(auth, async (user)=>{
+  if(user){
+    const email = (user.email||"").toLowerCase();
+    if(!WHITELIST.includes(email)){
+      await signOut(auth);
+      mostrarPantallaLogin("Esa cuenta no está en la lista de chaveas invitados.");
+      return;
+    }
+    currentUser = user; guestMode = false;
+    $('loginScreen').style.display = 'none';
+    await cargarOcrearPerfil(user);
+    showIntro();
+  } else if(!guestMode){
+    mostrarPantallaLogin();
+  }
+});
+
 /* ================= ESTADO ================= */
 const S = { alc:0, dig:90, ene:105, din:45, resp:10 };
 const LIM = { alc:142, dig:100, ene:105, din:250, resp:100 };
@@ -162,6 +358,7 @@ const CH = {
   hdez:{n:"Alberto Hernández", a:"🤸"},
   grupo:{n:"Los Chaveas", a:"🍻"},
   amigo:{n:"El amigo de Pocho", a:"🎭"},
+  cameo:{n:"Encuentro inesperado", a:"✨"},
   tu:{n:"Tú, el aspirante", a:"🫡"}
 };
 
@@ -172,7 +369,7 @@ const AMIGOS = [
   {d:"Asegura haber sido campeón nacional de algo que nadie logra que repita dos veces igual."},
   {d:"Habla como si estuviera levantando acta de todo lo que ocurre. No es notario."},
   {d:"Dice que tiene un caballo. Insiste MUCHO en el caballo. Nadie ha visto el caballo."},
-  {d:"Lleva gorra de marino. Salme le hace tres preguntas técnicas y falla las tres. Se queda igual."},
+  {d:"Lleva gorra de marino y dice que navega. Salme le hace tres preguntas técnicas y falla las tres. Se queda igual."},
   {d:"Mide dos metros y habla muy bajito. Hay que acercarse tanto que todas sus historias parecen secretos."},
   {d:"Llega en chándal y con una bolsa de deporte que no abre en toda la noche. Nadie pregunta por la bolsa."}
 ];
@@ -212,7 +409,7 @@ const PHASES = [
       opts:[
         {t:"«Instagram. Tu terreno, capitán.»", out:{r:"«Correcto», dice, ya con el móvil fuera. En un movimiento que viola varias leyes de la física social, consigue que una de ellas le siga ANTES de acabar el postre. La mesa lo celebra como un gol en el descuento. Tú has sido parte del cuerpo técnico.", fx:{resp:+8}}},
         {t:"«En persona. Los clásicos nunca fallan.»", out:{r:"Salme niega lentamente, decepcionado. «En persona en la COMIDA no, chavea. En persona se entra de noche. De día se siembra, de noche se recoge. Apunta.» Has fallado el examen, pero la clase magistral valió la pena.", fx:{resp:-3, alc:+4}}},
-        {t:"«¿Y si te presentas como dueño de una escuela náutica?»", out:{r:"Silencio. Salme te mira como si acabaras de inventar el fuego. «...El barco. SIEMPRE el barco. Chavea, eres un peligro.» Guarda la frase para esta noche. Te has ganado su respeto profesional.", fx:{resp:+10}}}
+        {t:"«¿Y si les dices que llevas la escuela de foil?»", out:{r:"Silencio. Salme te mira como si acabaras de inventar el fuego.\n\n«...El foil.» Pausa. «Nadie sabe lo que es el foil, chavea. Y por eso funciona: tienen que PREGUNTAR.»\n\nY ahí está la doctrina completa en una frase. Guarda el hallazgo para esta noche. Te has ganado su respeto profesional.", fx:{resp:+10}}}
       ]},
     {ch:"turko", text:"Entre el segundo plato y el postre, el Turko se levanta con parsimonia de arquitecto. «Voy a ver la fachada del edificio de enfrente. Interesante juego de volúmenes.»\n\nTe mira. Es una invitación. Todos saben qué tipo de «arquitectura» se estudia en esa esquina.",
       opts:[
@@ -289,11 +486,11 @@ const PHASES = [
         {t:"Quitarle el móvil y esconderlo", out:{r:"Se lo arrancas de las manos y se lo pasas a Pocho, que lo hace desaparecer en el bolsillo de las trampas. El Turko protesta débilmente («es que el cliente...») y la mesa lo abuchea con cariño: «¡SIEMPRE IGUAL! ¡SIEMPRE HASTA EL ÚLTIMO MOMENTO!» A los diez minutos se le ha olvidado y está más feliz. Le has salvado el día y él lo sabe.", fx:{resp:+12, ene:-3}}},
         {t:"Ponerte a resolverle el problema en serio", out:{r:"Cometes el error de INTERESARTE. Veinte minutos después estáis los dos con servilletas dibujando vigas mientras el resto del grupo os mira con auténtica pena. Juanjo, gesticulando: «Hemos perdido a dos.» Aprendes que en el Chavea Day el curro se aparca, se ridiculiza y se olvida. En ese orden.", fx:{resp:-5, ene:-6}}}
       ]},
-    {ch:"salme", text:"Salme lleva veinte minutos con el móvil en horizontal, enseñándole la pantalla a Kike, y de pronto se gira hacia ti y te lo planta delante sin avisar.\n\nEs el Instagram de la escuela náutica. Un vídeo de un velero al atardecer, música épica, texto encima: «TU PRÓXIMA AVENTURA EMPIEZA AQUÍ.»\n\n«Chavea. Opinión sincera. ¿Funciona o no funciona?»\n\nLa mesa entera espera. Es un examen y no sabes de qué asignatura.",
+    {ch:"salme", text:"Salme lleva veinte minutos con el móvil en horizontal, enseñándole la pantalla a Kike, y de pronto se gira hacia ti y te lo planta delante sin avisar.\n\nEs lo único que sube a Instagram en todo el año: un vídeo de la escuela. Alguien haciendo foil al atardecer, música épica, texto encima: «TU PRÓXIMA AVENTURA EMPIEZA AQUÍ.»\n\nPorque el Instagram de Salme no tiene contenido. Nunca ha tenido contenido. Ese perfil es una herramienta de trabajo y el trabajo no es publicar: es escribir por privado. Lo de la escuela es la excepción del año.\n\n«Chavea. Opinión sincera. ¿Funciona o no funciona?»\n\nLa mesa entera espera. Es un examen y no sabes de qué asignatura.",
       opts:[
-        {t:"«Funciona. Pero cámbiale la música.»", out:{r:"Salme se queda quieto. Vuelve a poner el vídeo. Lo ve otra vez. «...La música.» Pausa larga. «LA MÚSICA.»\n\nSe pasa el resto de la sobremesa buscando canciones y a las ocho de la tarde el vídeo está republicado con música nueva. A la semana tendrá el triple de visitas y él te lo recordará durante años. Has entrado en el consejo asesor de la escuela náutica sin cobrar nada.", fx:{resp:+11}}},
-        {t:"«Aquí lo que vende eres tú, no el barco.»", set:["lavilla"], out:{r:"Silencio en la mesa. Y entonces Faé estalla: «¡LO HA DICHO! ¡LLEVAMOS DIEZ AÑOS DICIÉNDOSELO!»\n\nSalme finge indignación pero está claramente encantado. «Yo salgo poco porque soy discreto.» Carcajada general: el hombre más discreto del Instagram. Buen ojo, chavea: has tocado exactamente el nervio del grupo.", fx:{resp:+10, alc:+5}}},
-        {t:"«Yo de barcos no entiendo nada, Salme.»", out:{r:"«No te he preguntado de barcos», responde con paciencia. «Te he preguntado de INSTAGRAM.» Y ahí está el error: creías que el negocio de Salme eran los barcos.\n\nEl negocio de Salme nunca han sido los barcos. Guarda el móvil algo decepcionado y le pregunta al Turko, que le da tres ideas buenas sin apenas levantar la vista.", fx:{resp:-4}}}
+        {t:"«Funciona. Pero cámbiale la música.»", out:{r:"Salme se queda quieto. Vuelve a poner el vídeo. Lo ve otra vez. «...La música.» Pausa larga. «LA MÚSICA.»\n\nSe pasa el resto de la sobremesa buscando canciones y a las ocho de la tarde el vídeo está republicado con música nueva. A la semana tendrá el triple de visitas y él te lo recordará durante años. Has entrado en el consejo asesor de la escuela sin cobrar nada.", fx:{resp:+11}}},
+        {t:"«Aquí lo que vende eres tú, no el foil.»", set:["lavilla"], out:{r:"Silencio en la mesa. Y entonces Faé estalla: «¡LO HA DICHO! ¡LLEVAMOS DIEZ AÑOS DICIÉNDOSELO!»\n\nSalme finge indignación pero está claramente encantado. «Yo salgo poco porque soy discreto.» Carcajada general: el hombre más discreto del Instagram. Buen ojo, chavea: has tocado exactamente el nervio del grupo.", fx:{resp:+10, alc:+5}}},
+        {t:"«Yo de eso no entiendo nada, Salme.»", out:{r:"«No te he preguntado de foil», responde con paciencia. «Te he preguntado de INSTAGRAM.» Y ahí está el error: creías que el negocio de Salme era el agua.\n\nEl negocio de Salme nunca ha sido el agua. Guarda el móvil algo decepcionado y le pregunta al Turko, que le da tres ideas buenas sin apenas levantar la vista.", fx:{resp:-4}}}
       ]},
     {ch:"fae", text:"La sobremesa lleva dos horas y Faé no ha estado sentado ni veinte minutos seguidos. Ha cambiado de silla cuatro veces, ha hablado con la mesa de al lado, ha ido a la barra a hacerse amigo del camarero y ahora está de pie detrás de ti con las dos manos en el respaldo de tu silla.\n\n«Chavea. Chavea. Estoy pensando una cosa.»\n\nCuando Faé está pensando una cosa, la mesa entera se prepara. Nunca es una cosa pequeña.",
       opts:[
@@ -379,17 +576,23 @@ const PHASES = [
         {t:"«Yo creo que aguantas porque eres un fenómeno.»", out:{r:"El Turko se ríe con la boca cerrada, sin negarlo, que es su forma de aceptar un cumplido.\n\n«Bueno. Práctica también.» Da una calada. «Mucha práctica.»\n\nY ahí está la clave: no es genética, es OFICIO. Décadas de oficio. El grupo lleva media vida creyendo que el Turko tiene un don y resulta que lo que tiene son horas de vuelo.", fx:{resp:+8}}},
         {t:"Contarle que a ti ya te está costando", roll:{stat:"dig", dc:55, ok:{r:"Le confiesas la verdad: que llevas ocho horas, que la cabeza te va a otro ritmo y que no sabes si vas a llegar.\n\nEl Turko asiente sin juzgar, tira el cigarro y dice: «Pues vamos a arreglarlo.» Te trae un vaso de agua, te hace fumar despacio y te tiene diez minutos en la puerta hablando de nada.\n\nCuando volvéis dentro estás nuevo. Nadie más se habría dado cuenta, y nadie más lo habría arreglado sin decírselo a los demás.", fx:{resp:+9, ene:+14, alc:-8}}, ko:{r:"Intentas confesarlo pero te sale como una bravata: «Bueno, yo estoy PERFECTAMENTE, mejor que nadie.»\n\nEl Turko te mira un segundo de más. No dice nada. Y ese segundo de más es la evaluación completa: sabe exactamente cómo estás, sabe que has mentido y sabe que no ibas a admitirlo.\n\n«Ya. Pues nada.» Y vuelve dentro. Has perdido la única ayuda que se ofrecía gratis.", fx:{resp:-5, ene:-5}}}}
       ]},
-    {ch:"juanjo", si:()=>!!flags.vino, prio:true, text:"🥚 <b style='color:var(--gold)'>ESCENA LEGENDARIA</b>\n\nEl vino de la comida pasa factura, y la pasa aquí: en el Daniel Tavern.\n\nJuanjo entra, pide un chupito de algo verde que el camarero le recomienda con demasiado entusiasmo, se lo bebe... y sale por la puerta a velocidad de crucero.\n\nLo encuentras fuera, apoyado en un coche, terminando el trabajo. Cuando se incorpora está pálido, sereno y completamente nuevo, como quien acaba de reiniciar un ordenador.\n\nSe limpia con el dorso de la mano, mira hacia la puerta del bar y sentencia, con un rencor personal y profundo:\n\n«Daniel Taberna... CABRONCETE.»\n\nY acto seguido, sin transición: «Chavea, píllame una botellita de agua. Una botellita de agua mu rica.»",
+    {ch:"juanjo", si:()=>!!flags.vino, prio:true, text:"🥚 <b style='color:var(--gold)'>ESCENA LEGENDARIA</b>\n\nCamino del siguiente sitio, alguien lo dice y ya no hay marcha atrás: «¿Nos metemos un momento en el Daniel Tavern?»\n\nNo estaba en la ruta de Kike. Nunca está en la ruta de Kike. Pero el Daniel Tavern pilla de camino a todo y por eso siempre se acaba entrando «un momento», que en el idioma de este grupo significa hora y media.\n\nY aquí es donde el vino de la comida pasa factura.\n\nJuanjo entra, pide un chupito de algo verde que el camarero le recomienda con demasiado entusiasmo, se lo bebe... y sale por la puerta a velocidad de crucero.\n\nLo encuentras fuera, apoyado en un coche, terminando el trabajo. Cuando se incorpora está pálido, sereno y completamente nuevo, como quien acaba de reiniciar un ordenador.\n\nSe limpia con el dorso de la mano, mira hacia la puerta del bar y sentencia, con un rencor personal y profundo:\n\n«Daniel Taberna... CABRONCETE.»\n\nY acto seguido, sin transición: «Chavea, píllame una botellita de agua. Una botellita de agua mu rica.»",
       opts:[
         {t:"Traerle la botellita de agua mu rica", out:{r:"Se la traes. Y hay que verlo beber: cierra los ojos, da tres tragos largos y suelta un «uffff» que sale de los pies.\n\n«Mu rica», confirma. «MU RICA.»\n\nY entonces, restaurado por completo, se gira, entra otra vez en el Daniel Tavern, y a los cuatro minutos lo ves hablando con una chica en la barra. Riéndose. Encantador. En plena forma.\n\nA los cuatro minutos de vomitar. CUATRO.\n\nEl Turko lo ve desde fuera, da una calada y comenta lo único que se puede comentar: «Este hombre no es de este mundo.»", fx:{resp:+16, din:-3}}},
         {t:"Traerle agua y quedarte vigilando que no vuelva a entrar", out:{r:"Le traes el agua y encima montas guardia, porque tienes claro que ese chupito verde sigue ahí dentro esperándole.\n\nJuanjo bebe, agradece, y te explica con las manos —con TODAS las manos— que él ya está perfectamente y que va a entrar.\n\nLe cortas el paso. Discutís tres minutos en la acera. Ganas tú por agotamiento.\n\nY al día siguiente, cuando en el grupo alguien pregunte por qué esta vez Juanjo llegó entero al amanecer, la respuesta va a ser tu nombre.", fx:{resp:+13, ene:-6, din:-3}}},
         {t:"«Juanjo, ¿tú no acabas de potar?»", out:{r:"Se lo dices mientras él ya está entrando otra vez.\n\nJuanjo se para, se gira, y te contesta con la solemnidad de un hombre que ha meditado mucho sobre esto:\n\n«Chavea. Lo de dentro ya está fuera.»\n\nY entra. Y liga. Y tú te quedas en la acera reordenando todo lo que creías saber sobre el cuerpo humano.", fx:{resp:+9, alc:+6}}}
       ]},
-    {ch:"salme", si:()=>!!flags.lavilla, prio:true, text:"🥚 <b style='color:var(--gold)'>ESCENA LEGENDARIA</b>\n\nY entonces, de entre toda la gente del bar, aparece LAVILLA.\n\nAmigo de la infancia. De los de verdad, de los del colegio, de los que no ves en diez años y siguen tratándote igual. Abrazos, alegría, «pero bueno, ¿tú qué haces aquí?». Un momento precioso.\n\nDura noventa segundos.\n\nPorque Lavilla se gira hacia Salme, sonríe con toda la inocencia del mundo y dice las siete palabras que no se pueden decir:\n\n«¿Te acuerdas del día del ojo?»\n\nY a Salme se le cae la cara. Literalmente. Se le apaga. Pasa de estar riéndose a mirar al suelo en medio segundo, porque hay una historia de cuando eran críos en la que Salme estuvo así de cerca de perder un ojo, y Lavilla es el único ser humano vivo que la cuenta como si fuera graciosa.\n\nLavilla ya está cogiendo aire para empezar. Tienes tres segundos antes de que Salme se hunda para el resto de la noche.",
+    {ch:"cameo", si:()=>!!flags.lavilla, prio:true, set:["manolo"], text:"🥚 <b style='color:var(--gold)'>ESCENA LEGENDARIA</b>\n\nMANOLO LAVILLA.\n\nPadre de Lavilla. Y un hombre absolutamente peculiar, porque Manolo Lavilla sabe de todo. De TODO. O al menos él lo cree, que a efectos prácticos es exactamente lo mismo.\n\nSe acerca, saluda a todos por su nombre, y te localiza a ti, que eres carne fresca.\n\n«¿Y tú a qué te dedicas, chavea?»\n\nY aquí viene lo importante: da igual lo que contestes. Da absolutamente igual. Porque él también se dedicó a eso, o casi, o conoce a alguien que se dedica y le ha contado, y en cualquier caso sabe más que tú.\n\nEl Turko te susurra sin mover los labios: «No le digas ningún deporte. Ninguno.»",
       opts:[
-        {t:"Sacar a Salme de allí con cualquier excusa", roll:{stat:"dig", dc:60, ok:{r:"«¡Salme! ¡SALME! Que te llaman de la barra, tío, urgente.»\n\nNo existe ninguna llamada. Da igual. Le pones la mano en la espalda y te lo llevas de allí sin que Lavilla llegue a terminar la primera frase, mientras Kike —que ha entendido la maniobra en el aire— se planta delante de Lavilla y le pregunta por su coche.\n\nA veinte metros, Salme suelta el aire de golpe.\n\n«Gracias, chavea.» Pausa. «De verdad.»\n\nY no vuelve a mencionarse. Nunca. Que es exactamente como hay que hacerlo.", fx:{resp:+18}}, ko:{r:"Intentas sacarlo, pero Lavilla es más rápido y ya ha arrancado la historia entera delante de todo el mundo, con detalles, con gestos, riéndose él solo.\n\nSalme se queda. Escucha. Sonríe con la boca cerrada. Y cuando Lavilla termina, dice «sí, qué bueno» con una voz que no es la suya.\n\nEl resto de la noche está apagado. Responde con monosílabos, no saca el móvil ni una vez, y a las cuatro se va sin despedirse. No ha sido culpa tuya del todo. Pero estabas allí y no llegaste.", fx:{resp:-8, dig:-6}}}},
-        {t:"Cortar a Lavilla en seco tú mismo", out:{r:"Te metes por delante antes de que empiece: «Lavilla, tío, esa historia no. Hoy no.»\n\nLavilla te mira sin entender nada —él nunca ha entendido nada de esto, ese es el problema— pero acepta y cambia de tema.\n\nSalme no dice nada en ese momento. Pero dos horas después, en la calle, te pasa el brazo por el hombro y suelta: «Oye. Lo de antes.» Y ya está. No hace falta más.\n\nEn este grupo, lo que se protege sin hacer ruido vale el doble.", fx:{resp:+15}}},
-        {t:"Preguntar tú por curiosidad qué pasó con el ojo", out:{r:"Metes la pata hasta el fondo, y encima con entusiasmo: «¿Qué ojo? ¿Qué pasó?»\n\nLavilla se lanza. Cuenta la historia completa. Y la cuenta bien, además, con lo cual todo el bar se ríe menos uno.\n\nSalme se queda mirando su copa hasta el final. No te lo va a reprochar nunca, porque no es de esos. Pero durante el resto de la noche, cada vez que pases por su lado, te vas a acordar de esto.", fx:{resp:-14, dig:-4}}}
+        {t:"Decirle tu trabajo y aguantar la clase", out:{r:"Se lo dices. Y arranca.\n\nDiecisiete minutos explicándote tu propio trabajo. Con errores, sí, pero con una seguridad tan absoluta que en algún momento empiezas a dudar tú.\n\nY lo mejor: termina con un «pero bueno, tú de esto sabrás más que yo», dicho con una humildad completamente falsa y a destiempo, cuando ya ha dado la charla entera.\n\nLos chaveas te miran desde la barra con una compasión enorme. Faé levanta la copa hacia ti: el saludo de los caídos. Has pasado el peaje que pasan todos los nuevos.", fx:{resp:+11, ene:-8}}},
+        {t:"Nombrarle un deporte a ver qué pasa", out:{r:"Ignoras el aviso del Turko y sueltas que juegas al pádel.\n\nManolo Lavilla ha jugado al pádel. Y antes al tenis, y al frontón, y estuvo federado en algo que no queda claro. Te explica que agarras mal la pala. Te lo demuestra con una servilleta enrollada. Te corrige la postura DE VERDAD, ahí mismo, en el bar.\n\nY lo peor de todo, lo verdaderamente devastador, es que la corrección es buena. Tiene razón. Llevas años agarrándola mal.\n\nEl Turko, desde atrás, mientras enciende otro: «Te lo dije.»", fx:{resp:+13, ene:-10, dig:-5}}},
+        {t:"Contraatacar: preguntarle tú a él por algo raro", out:{r:"Cambias la táctica: en vez de defenderte, atacas. Le preguntas por algo lo bastante específico como para que no pueda saberlo.\n\nManolo Lavilla no duda ni un segundo. Contesta. Con detalles. Con fechas.\n\nY tú no tienes ni idea de si lo que ha dicho es verdad o se lo acaba de inventar entero, y esa duda —esa duda exacta— es la experiencia Manolo Lavilla en estado puro. Nadie la ha resuelto nunca.\n\nKike, que lleva años en la misma investigación: «¿Verdad que no lo sabes? Pues bienvenido.»", fx:{resp:+14, alc:+5}}}
+      ]},
+    {ch:"cameo", text:"🥚 <b style='color:var(--gold)'>ESCENA LEGENDARIA</b>\n\nY de pronto, en mitad del bar, ÁNGEL CEPAS.\n\nY hay que explicarte quién es Ángel Cepas, porque tú eres nuevo: leyenda. Sinvergüenza mayor. De los que en su día hacían que un Chavea Day pareciera una merienda. Historias que aún se cuentan y que él nunca ha desmentido.\n\nPero eso era antes. Ahora tiene dos bebés. DOS. Y está rehabilitado: no sale, no bebe, no trasnocha. Nada.\n\nSalvo días excepcionales. Y hoy, por lo visto, es uno.\n\nAsí que aquí está: con una cerveza en la mano —UNA— mirándola como quien mira un objeto arqueológico, con dos horas de permiso y cara de estar disfrutando muchísimo de algo que antes hacía sin pensar.\n\nY lo primero que hace al veros, antes incluso de saludar, es sacar el móvil y enseñaros fotos de las niñas.",
+      opts:[
+        {t:"Mirar las fotos con interés de verdad", out:{r:"Y las miras. Las cuarenta. Preguntas cuál es cuál, cuánto duermen, si se parecen entre ellas.\n\nÁngel se viene arriba de una manera que no esperabas: habla de las niñas veinte minutos seguidos, con una felicidad tan evidente que resulta desarmante viniendo del hombre del que se cuentan esas historias.\n\nCuando por fin se va —a la hora exacta que había dicho, ni un minuto más— el grupo se queda en silencio un rato.\n\n«Qué bien está», dice Juanjo. Y lo dice de verdad. Aquí nadie se ríe de esto: aquí se respeta muchísimo.", fx:{resp:+14}}},
+        {t:"Intentar resucitar al Cepas de antes: «¿un chupito?»", out:{r:"Se lo ofreces medio en broma. Y Ángel se queda mirando el chupito un segundo de más.\n\nUN SEGUNDO DE MÁS.\n\nY entonces sonríe, niega con la cabeza y dice: «Uf. No sabes lo que me estás pidiendo, chavea.»\n\nSe termina su cerveza, se despide de todos uno por uno, y se va a su hora.\n\nPocho te lo comenta después, sin reproche: «Ese hombre lo tiene atado con alambres. Y aun así ha venido a vernos dos horas. No se le tienta, se le agradece.» Anotado para siempre.", fx:{resp:-6}}},
+        {t:"Preguntarle por una de sus historias antiguas", out:{r:"Le pides que cuente una. La del... bueno, tú tampoco sabes cuál, pero pides una.\n\nY se le enciende la cara. Cuenta una. Y luego otra. Y el grupo entero se coloca alrededor como críos en un corro, porque estas historias las han oído mil veces pero nunca de su boca, y de su boca son otra cosa.\n\nVeinte minutos gloriosos. Al final mira el reloj, se levanta, y suelta la frase que se va a repetir el resto de la noche:\n\n«Y ahora me voy a casa, que a las siete tengo biberón.»\n\nY se va tan contento. Faé se queda mirando la puerta: «Ese tío ha ganado, ¿no? Yo creo que ese tío ha ganado.»", fx:{resp:+16, alc:+5}}}
       ]},
     {ch:"pocho", text:"En un aparte de barra, Pocho se te acerca con esa sonrisa suya de estar más cariñoso de la cuenta. Baja la voz: «Chavea... ¿tú confías en mí?» Se toca el bolsillo mágico de la chaqueta. Las legendarias «trampas» de Pocho, de las que hablan las crónicas. No pregunta dos veces.",
       opts:[
@@ -459,7 +662,7 @@ const PHASES = [
       ]},
     {ch:"grupo", text:"Faé saca del bolsillo un bulto de tela doblado. LA BANDERA. La bandera de los chaveas, la que se regaló el año de la camiseta, la que preside cada Chavea Day desde entonces colgada donde se pueda: barandillas, respaldos, una vez el capó de un coche patrulla (asunto cerrado y no comentado).\n\nLa despliega en mitad de la discoteca y busca sitio con la mirada. Localiza el objetivo: la barandilla del reservado VIP, dos metros por encima de la zona acordonada.\n\n«Chavea. Tú eres el que menos ha bebido de los que quedan. TE TOCA.»",
       opts:[
-        {t:"Escalar y colgar la bandera en el VIP", roll:{stat:"ene", dc:78, ok:{r:"Te encaramas a la barandilla con una agilidad que ni tú te esperabas, atas la bandera con dos nudos que Salme (capitán náutico) aprueba a gritos desde abajo, y saltas.\n\nLa bandera de los chaveas ondea sobre el VIP de la discoteca. Guille llora. Faé toca el silbato nuevo. Los de la zona VIP, sin entender nada, hacen fotos. Ha entrado en el histórico y estabas TÚ arriba.", fx:{resp:+15, ene:-12, dig:-4}}, ko:{r:"Subes, atas la bandera... y el nudo se deshace en cuanto sueltas. La bandera cae en toda la cara de un tipo del VIP, que se levanta ofendidísimo. Segundos de tensión diplomática hasta que ve el escudo, pregunta qué es, y Faé le suelta una explicación de siete minutos tras la cual el tipo quiere UNA CAMISETA.\n\nCaos gestionado. La bandera acaba colgada. Tú acabas con el codo pelado.", fx:{resp:+7, ene:-15, dig:-8}}}},
+        {t:"Escalar y colgar la bandera en el VIP", roll:{stat:"ene", dc:78, ok:{r:"Te encaramas a la barandilla con una agilidad que ni tú te esperabas, atas la bandera con dos nudos que Salme, que de nudos sabe, aprueba a gritos desde abajo, y saltas.\n\nLa bandera de los chaveas ondea sobre el VIP de la discoteca. Guille llora. Faé toca el silbato nuevo. Los de la zona VIP, sin entender nada, hacen fotos. Ha entrado en el histórico y estabas TÚ arriba.", fx:{resp:+15, ene:-12, dig:-4}}, ko:{r:"Subes, atas la bandera... y el nudo se deshace en cuanto sueltas. La bandera cae en toda la cara de un tipo del VIP, que se levanta ofendidísimo. Segundos de tensión diplomática hasta que ve el escudo, pregunta qué es, y Faé le suelta una explicación de siete minutos tras la cual el tipo quiere UNA CAMISETA.\n\nCaos gestionado. La bandera acaba colgada. Tú acabas con el codo pelado.", fx:{resp:+7, ene:-15, dig:-8}}}},
         {t:"Colgarla en sitio seguro pero visible", out:{r:"Aplicas criterio: nada de VIP, nada de escaladas. La atas en la barandilla de la escalera principal, por donde pasa TODO el mundo. Visibilidad máxima, riesgo cero.\n\nFaé protesta («¡sin épica!») pero Pocho te respalda: «La bandera tiene que estar colgada AL FINAL de la noche, no arrancada a los diez minutos. El chavea ha pensado.» Y así fue: aguantó hasta el cierre.", fx:{resp:+9, ene:-4}}},
         {t:"«¿Lleváis la bandera SIEMPRE encima?»", out:{r:"Los tres que están cerca te miran como si hubieras preguntado si respiran. «Hombre.» Y ya está. Esa es toda la respuesta que vas a obtener.\n\nFaé se la cuelga él mismo, de cualquier manera, y se cae a los cuatro minutos. Podría haber sido tu momento. La has dejado pasar por preguntar lo obvio.", fx:{resp:-3, alc:+5}}}
       ]},
@@ -468,6 +671,18 @@ const PHASES = [
         {t:"Quedarte con él en el suelo hasta que se recupere", out:{r:"Te sientas en el suelo a su lado y no te mueves. Le hablas bajito, le dices dónde está, le pides que no se levante todavía. Pocho le sujeta la cabeza. El Turko despeja a la gente con esa autoridad tranquila que no sabías que tenía.\n\nDiez minutos después Guille está sentado, bebiendo agua, avergonzadísimo y perfectamente lúcido. No quiere hospital. Dice que le ha pasado otra vez, hace años.\n\nLa fiesta se ha acabado, eso lo sabe todo el mundo sin decirlo. Salís a la calle y os quedáis media hora en un banco, en silencio, los que quedáis, mirándole respirar.\n\nHan sido las horas más raras del día. Y ninguno de vosotros las va a olvidar.", fx:{resp:+20, ene:-18, alc:-15}}},
         {t:"Organizar al grupo: uno llama, otro despeja, otro trae agua", out:{r:"Te sale de dentro y sale bien: «Kike, sigue con el teléfono. Turko, aparta a la gente. Salme, agua. Juanjo, la chaqueta debajo de la cabeza. Pocho, quédate con él.»\n\nY todo el mundo obedece, porque a las dos de la mañana, cuando pasa algo de verdad, la gente agradece muchísimo que alguien diga qué hacer.\n\nGuille se recupera solo, sentado, con la cara blanca. No hace falta ambulancia. Le llevaréis a casa entre todos y mañana irá al médico, y lo dirá en el grupo, y todos os quedaréis tranquilos.\n\nNadie te lo va a decir esta noche porque están todos en shock. Pero lo has hecho tú.", fx:{resp:+22, ene:-15, alc:-15}}},
         {t:"Apartarte, que ya hay demasiada gente encima", out:{r:"Das un paso atrás y dejas hacer a los veteranos, que además saben lo que hacen: Pocho y el Turko lo tienen controlado en treinta segundos.\n\nGuille se recupera. Todo acaba bien. Tú no has estorbado, que también es una forma de ayudar.\n\nPero cuando salís a la calle y os sentáis en un banco, hay un hueco a su lado y lo ocupa otro. No pasa nada. Simplemente, no eras tú.", fx:{resp:+4, alc:-10, ene:-8}}}
+      ]},
+    {ch:"cameo", text:"🥚 <b style='color:var(--gold)'>ESCENA LEGENDARIA</b>\n\nEstáis en la puerta fumando cuando lo oís antes de verlo: un motor revolucionado calle abajo, subiendo de vueltas.\n\nY aparece EL ALEFUCKING. Haciendo un caballito. En la calle. A la una de la mañana. Sin casco, obviamente.\n\nPasa por delante de vosotros con la rueda delantera en el aire, os ve, y —esto es lo importante— NO BAJA LA RUEDA. Os saluda con la mano libre mientras sigue subido, gritando algo que nadie entiende, y desaparece por la esquina.\n\nTres segundos de silencio en la puerta.\n\n«¿Ese era...?» — «Sí.» — «¿Y venía a saludar?» — «Yo creo que sí.»\n\nNadie sabe de dónde venía. Nadie sabe adónde iba. Aparece una vez por Chavea Day, siempre así, y nunca se para.",
+      opts:[
+        {t:"Devolverle el saludo con las dos manos", out:{r:"Levantas los dos brazos y le pegas un grito. Y él, desde la moto, con la rueda todavía arriba, TE DEVUELVE EL SALUDO.\n\nLa maniobra es objetivamente temeraria y visualmente perfecta.\n\nGuille se queda mirando la esquina por donde ha desaparecido durante un rato largo y luego dice, con toda la seriedad de un ingeniero: «Físicamente eso no debería haber salido bien.»\n\nPero salió. Siempre sale. Y tú has sido saludado por el AleFucking en tu primer Chavea Day, cosa que le llevó tres años a más de uno.", fx:{resp:+14, alc:+5}}},
+        {t:"Sacar el móvil para grabarlo", roll:{stat:"ene", dc:70, ok:{r:"Reflejos. Sacas el móvil y lo pillas: cuatro segundos de vídeo con la rueda en el aire, el saludo y el grito.\n\nCUATRO SEGUNDOS DE ORO.\n\nEse vídeo va a circular por el grupo durante meses. Se va a reenviar en Navidad. Se va a usar como prueba en discusiones. Y lo grabaste tú, que ni siquiera eres del grupo todavía.\n\nSalme te lo pide inmediatamente. «Pásamelo. PÁSAMELO.»", fx:{resp:+16}}, ko:{r:"Sacas el móvil a toda prisa... y grabas cuatro segundos de una calle vacía y el ruido de un motor alejándose.\n\nSe lo enseñas al grupo con la esperanza de que se aprecie algo. No se aprecia nada.\n\n«Eso es una calle», dictamina el Turko.\n\nEl AleFucking ha vuelto a escapar sin documentar, como lleva haciendo años. Empiezas a sospechar que es parte de su naturaleza.", fx:{resp:+2, dig:-4}}}},
+        {t:"«¿Ese tío no debería llevar casco?»", out:{r:"Lo dices en voz alta y el grupo entero se gira hacia ti muy despacio.\n\n«¿Casco?», repite Faé.\n\nY Kike, que de vehículos entiende, te lo explica con la paciencia de un profesor: «Chavea. Ese hombre no lleva casco desde 2014. Si llevara casco no sería él. Sería otro señor en una moto.»\n\nTienes razón objetivamente y estás equivocado en todo lo demás. Es una sensación con la que te vas a tener que ir acostumbrando a convivir en este grupo.", fx:{resp:-3, alc:+5}}}
+      ]},
+    {ch:"cameo", si:()=>!!flags.manolo, prio:true, text:"🥚 <b style='color:var(--gold)'>ESCENA LEGENDARIA</b>\n\nY un rato después, en el Green, aparece Lavilla. El hijo.\n\nY notas algo raro inmediatamente: el grupo se recoloca. No se tensa exactamente, pero se recoloca, como cuando entra alguien y todo el mundo comprueba de reojo dónde está otra persona.\n\nPorque hay una historia. Hace años, en un rifirrafe que nadie cuenta entero, Lavilla le pegó a Salme. Y Salme estuvo así de cerca de perder un ojo.\n\nEso fue hace mucho. Fueron amigos, dejaron de serlo, y ahora son colegas otra vez: se saludan, se preguntan, se ríen. El grupo lo ha reincorporado como se reincorpora a la gente aquí, sin actas ni discursos, simplemente dejándole sitio.\n\nAdemás lleva sus movidas encima, y el grupo lo sabe: hay días buenos y días regulares, y hoy parece de los buenos. Pocho ya se ha colocado cerca de él sin que se note. El Turko también. Sin decir nada.\n\nY entonces Lavilla te ve a ti, el nuevo, y viene a presentarse.",
+      opts:[
+        {t:"Saludarle como a uno más y hablar de cualquier cosa", out:{r:"Le das la mano, te presentas y te pones a hablar de lo primero que surge. Sin preguntas raras, sin mirarle de más, sin el cuidadito ese que la gente pone y que se nota a kilómetros.\n\nY se está bien. Es un tío majo. Habláis un rato largo de motos y de un viaje que hizo.\n\nCuando te separas, Pocho te lo dice bajito, y no es un cumplido menor:\n\n«Le has tratado normal. Eso es lo único que hay que hacer y casi nadie lo hace.»", fx:{resp:+16}}},
+        {t:"Estar atento por si Salme se incomoda", out:{r:"Sin dejar de hablar con Lavilla, vas controlando dónde está Salme. Y no hace falta: se saludan de lejos, se hacen un gesto con la barbilla, y ya.\n\nEstá superado. Lo tienen superado hace años. El único que estaba tenso eras tú.\n\nEl Turko te lee la cara: «Chavea, ellos ya lo arreglaron. Lo que pasa es que la historia es tan buena que nos la seguimos contando.» Y ahí está la clave de este grupo entero: las historias duran más que los problemas.", fx:{resp:+11}}},
+        {t:"Sacar el tema del ojo para romper el hielo", out:{r:"Lo dices sin mala intención, como quien menciona una anécdota conocida.\n\nY se hace un silencio de dos segundos que dura muchísimo más de dos segundos.\n\nNo pasa nada grave: Lavilla se ríe un poco, Salme —desde tres metros— ni se gira. Se cambia de tema y la noche sigue.\n\nPero Pocho te lleva un momento aparte, sin dramatismo: «De lo suyo hablan ellos cuando quieren. Nosotros no. Ni de eso ni de lo otro. Aquí se pregunta qué tal estás, no qué te pasó.»\n\nY es la lección más valiosa que te llevas del día.", fx:{resp:-10, dig:-4}}}
       ]},
     {ch:"grupo", text:"Un chavea nunca busca una pelea. Pero a veces una pelea encuentra a un chavea.\n\nHa pasado en dos segundos: un roce, una copa derramada, y ahora hay un tío enorme con dos amigos detrás señalando a uno de los tuyos y diciendo cosas que no admiten segunda lectura. El chavea en cuestión, que no ha hecho nada, tiene esa cara de «pero si yo solo estaba aquí» que no ha servido de nada en la historia de la humanidad.\n\nY tienes un problema añadido, mucho más grave que los tres tíos: <b>Guille está a cuatro metros</b>. De espaldas. Sin enterarse todavía.\n\nSi Guille se entera, esto deja de ser una discusión y pasa a ser otra cosa. Otra cosa de las que salen en el periódico local.\n\nTienes unos segundos.",
       opts:[
@@ -646,7 +861,7 @@ let rescates = 0;
 const MECENAS = [
   {ch:"juanjo", r:"Juanjo te ve palpándote los bolsillos con cara de tragedia y lo entiende antes de que digas nada.\n\nSaca un billete de 50 y te lo mete en el bolsillo de la camisa él mismo, con las dos manos, acompañándolo de un gesto amplio que significa «no se hable más».\n\n«Chavea. Al Chavea Day no se viene a hacer cuentas.»"},
   {ch:"kike", r:"Kike, sin dejar de mirar el móvil, alarga el brazo y te planta 50 euros en la mano.\n\n«Toma.»\n\n«Te lo devuelvo el...»\n\n«Toma.» Y vuelve a lo suyo. Un hombre con tres vehículos no discute de cincuenta euros a estas horas."},
-  {ch:"salme", r:"Salme te ve seco y reacciona con la naturalidad de quien resuelve un problema logístico menor.\n\n«¿Sin pasta? Toma 50. Me lo devuelves cuando te apuntes a un curso de patrón.»\n\nY lo dice medio en broma... pero saca el móvil y te enseña las tarifas. Nunca deja de trabajar. Nunca."},
+  {ch:"salme", r:"Salme te ve seco y reacciona con la naturalidad de quien resuelve un problema logístico menor.\n\n«¿Sin pasta? Toma 50. Me lo devuelves cuando te apuntes a un curso de foil.»\n\nY lo dice medio en broma... pero saca el móvil y te enseña las tarifas. Nunca deja de trabajar. Nunca."},
   {ch:"guille", r:"Guille se saca del bolsillo un billete de 50 arrugadísimo, lo estira contra la pierna con muchísimo cuidado y te lo entrega como quien entrega un documento importante.\n\n«Esto... esto es PARA TI. Y no me lo devuelvash.» Pausa. «Bueno, sí. Mañana. O nunca.» Otra pausa. «Nunca esh mejor.»"},
   {ch:"turko", r:"El Turko no pregunta. Ve la situación desde la barra, se acerca, te deja 50 euros en la mano y te lo resume con una calada:\n\n«El dinero se acaba, la noche no. Eso ya lo tenías que saber, chavea.»\n\nY vuelve a su sitio antes de que te dé tiempo a darle las gracias."},
   {ch:"fae", r:"Faé se entera de que estás sin blanca y, como todo lo suyo, lo convierte en un acto público:\n\n«¡¡SEÑORES!! ¡¡EL ASPIRANTE ESTÁ TIESO!!»\n\nMonta una colecta en treinta segundos, pasando una gorra imaginaria, y te entrega 50 euros con una ceremonia de entrega de trofeo. Todo el bar aplaude. Tú querrías desaparecer, pero tienes 50 pavos."},
@@ -688,7 +903,7 @@ function showIntro(){
     <div class="roster">
       <div class="r">🍬 <b>Juanjo «Golosina»</b> — Aguante de titanio, ácido traicionero. Vomitó las cortinas de una discoteca en rojo Rioja.</div>
       <div class="r">😈 <b>Enrique «Kike» Hernández</b> — Ingeniero del zigzag. Recibe llamadas que nadie sabe de quién son. Tiene Land Rover, moto, barco... siempre para llevar rubias en él.</div>
-      <div class="r">⚓ <b>Salme «Perubian»</b> — Capitán de escuela náutica y del Instagram. Una vez se llevó a casa a un grupo de 3 y la ciencia aún lo estudia.</div>
+      <div class="r">⚓ <b>Salme «Perubian»</b> — Escuela náutica (foil, windsurf, kayak) y campeón del Instagram, que no usa para publicar. Una vez se llevó a casa a un grupo de 3 y la ciencia aún lo estudia.</div>
       <div class="r">🔩 <b>Guille «El Loko»</b> — Ingeniero. Analítico. Tranquilo. Hasta que ya no. Y cuando no... LOKURA.</div>
       <div class="r">🌿 <b>El Turko Macías</b> — Arquitecto. Fuma y bebe lo que quiera y siempre va «relativamente bien». Recoge el último.</div>
       <div class="r">🎺 <b>Faé Andrade</b> — Centro de gravedad de toda fiesta. Nos echaron de una discoteca por su culpa. Mereció la pena.</div>
@@ -778,14 +993,19 @@ function pick(i){
 }
 
 /* ================= FINALES ================= */
-function showEnding(e){
+function showEnding(e, conRanking=true){
   $('hud').style.display='none';
+  const rankingBlock = conRanking ? `<div class="ranking" id="rankingBox"><div class="loading">Cargando ranking…</div></div>` : '';
   stage(`<div class="ending"><div class="medal">${e.icon}</div><h2>${e.title}</h2>
     <div class="scene-text">${e.text}</div>
+    ${rankingBlock}
     <div class="choices" style="margin-top:22px;">
       <button class="next" onclick="startGame()">🔁 Otro Chavea Day (revancha)</button>
       <button class="choice" onclick="showIntro()">← Volver al principio</button>
     </div></div>`);
+  if(conRanking){
+    guardarResultadoPartida(e).finally(()=>pintarRanking('rankingBox'));
+  }
 }
 
 function finalJudgement(){
@@ -823,7 +1043,12 @@ Puedes volver a intentarlo. El Chavea Day siempre vuelve. Una vez al año, sin f
   showEnding(e);
 }
 
-showIntro();
+window.startGame = startGame;
+window.nextScene = nextScene;
+window.pick = pick;
+window.showIntro = showIntro;
+/* El arranque ya no es automático: lo dispara onAuthStateChanged
+   (login con Google válido, o modo invitado) más arriba. */
 </script>
 </body>
 </html>
