@@ -117,6 +117,49 @@
   /* variante para la pantalla de inicio: va arriba del todo, sin línea superior */
   .ranking.top{margin:0 0 20px; border-top:none; border-bottom:1px solid var(--border);
     padding-top:0; padding-bottom:16px;}
+
+  /* ===== CHAVEADEX: encuentro salvaje ===== */
+  .enc{text-align:center; padding:30px 10px;}
+  .enc .enc-pre{font-family:Verdana,sans-serif; font-size:.72rem; color:var(--muted); letter-spacing:3px;}
+  .enc .enc-avatar{font-size:5.5rem; margin:18px 0 10px; display:inline-block;
+    filter:brightness(0) drop-shadow(0 0 18px rgba(176,136,249,.55));
+    animation:encReveal 1.8s ease forwards;}
+  @keyframes encReveal{
+    0%{filter:brightness(0) drop-shadow(0 0 18px rgba(176,136,249,.55)); transform:scale(.55);}
+    45%{filter:brightness(0) drop-shadow(0 0 18px rgba(176,136,249,.55)); transform:scale(1.08);}
+    60%{transform:scale(1);}
+    100%{filter:none; transform:scale(1);}
+  }
+  .enc h2{color:var(--gold); font-size:1.3rem; letter-spacing:1px; margin:6px 0; animation:pop .4s ease .9s backwards;}
+  .enc .enc-tier{display:inline-block; font-family:Verdana,sans-serif; font-size:.68rem; letter-spacing:2px;
+    border:1px solid currentColor; border-radius:99px; padding:3px 12px; margin-top:8px;}
+  .enc .enc-new{margin:16px auto 0; display:inline-block; font-family:Verdana,sans-serif; font-weight:bold;
+    font-size:.8rem; color:var(--gold); border:2px dashed var(--gold); border-radius:10px; padding:8px 14px;
+    transform:rotate(-3deg); animation:pop .4s ease 1.6s backwards;}
+  .enc .enc-count{margin-top:14px; font-family:Verdana,sans-serif; font-size:.72rem; color:var(--muted);}
+
+  /* ===== CHAVEADEX: galería ===== */
+  .dexhead{text-align:center; margin-bottom:14px;}
+  .dexhead h2{color:var(--gold); letter-spacing:2px;}
+  .dexhead .dexstats{font-family:Verdana,sans-serif; font-size:.75rem; color:var(--muted); margin-top:6px;}
+  .dex-tier-title{font-family:Verdana,sans-serif; font-size:.7rem; letter-spacing:2px; margin:18px 0 8px; font-weight:bold;}
+  .dexgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px;}
+  .dex-cell{background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:10px; text-align:center;}
+  .dex-cell .dex-num{display:block; font-family:Verdana,sans-serif; font-size:.6rem; color:var(--muted); letter-spacing:1px;}
+  .dex-cell .dex-a{font-size:2.2rem; display:block; margin:4px 0;}
+  .dex-cell.locked .dex-a{filter:brightness(0) opacity(.9);}
+  .dex-cell b{font-size:.85rem;}
+  .dex-cell .dex-chip{display:inline-block; font-family:Verdana,sans-serif; font-size:.58rem; letter-spacing:1px;
+    border-radius:99px; padding:2px 8px; margin-top:5px; border:1px solid var(--border); color:var(--muted);}
+  .dex-cell.reg .dex-chip{color:var(--green); border-color:var(--green);}
+  .dex-cell.visto .dex-chip{color:var(--gold); border-color:var(--gold);}
+  .dex-cell p{font-size:.72rem; color:var(--muted); font-style:italic; line-height:1.45; margin-top:6px;}
+  .dex-cell .dex-n{font-family:Verdana,sans-serif; font-size:.6rem; color:var(--muted); margin-top:5px; display:block;}
+  .dex-badge{font-family:Verdana,sans-serif; font-size:.72rem; color:var(--gold); margin-top:12px;
+    border:1px dashed var(--gold); border-radius:99px; display:inline-block; padding:4px 12px;}
+  .dexnews{margin-top:18px; border-top:1px solid var(--border); padding-top:14px; text-align:center;}
+  .dexnews h3{color:var(--gold); font-size:.95rem; font-family:Verdana,sans-serif; letter-spacing:1px; margin-bottom:8px;}
+  .dexnews div{font-family:Verdana,sans-serif; font-size:.78rem; color:var(--text); padding:3px 0;}
 </style>
 </head>
 <body>
@@ -231,17 +274,27 @@ async function guardarResultadoPartida(finalInfo){
       resultado: finalInfo.title,
       resp: Math.round(S.resp), alc: Math.round(S.alc), dig: Math.round(S.dig),
       ene: Math.round(S.ene), din: Math.round(S.din),
-      chaveasVistos: vistos, flags: flags
+      chaveasVistos: vistos, flags: flags, dex: dexGame
     });
-    // 2) actualizar el perfil agregado
+    // 2) actualizar el perfil agregado (incluida la Chaveadex acumulada)
     const perfilRef = doc(db, "perfiles", uid);
     const perfilSnap = await getDoc(perfilRef);
     const anterior = perfilSnap.exists() ? perfilSnap.data() : {partidas:0, mejorResp:0};
     const mejorResp = Math.max(anterior.mejorResp||0, Math.round(S.resp));
+    const dexTotal = {...miDex};
+    for(const id in dexGame){
+      const g = dexGame[id], p = dexTotal[id]||{v:0, r:false};
+      const entrada = { v:(p.v||0)+(g.v||0), r:!!(p.r||g.r) };
+      const variantes = [...new Set([...(p.variantes||[]), ...(g.variantes||[])])];
+      if(variantes.length) entrada.variantes = variantes;
+      dexTotal[id] = entrada;
+    }
     await setDoc(perfilRef, {
       nombre: currentUser.displayName||"Chavea", email: currentUser.email, foto: currentUser.photoURL||"",
-      partidas: (anterior.partidas||0) + 1, mejorResp, actualizado: serverTimestamp()
+      partidas: (anterior.partidas||0) + 1, mejorResp, chaveadex: dexTotal, actualizado: serverTimestamp()
     }, {merge:true});
+    // la partida ya está fusionada en el histórico: no contarla dos veces
+    miDex = dexTotal; dexGame = {};
     // 3) actualizar el ranking global (una fila por usuario)
     await setDoc(doc(db, "ranking", uid), {
       nombre: currentUser.displayName||"Chavea", foto: currentUser.photoURL||"",
@@ -308,8 +361,10 @@ onAuthStateChanged(auth, async (user)=>{
     $('loginScreen').style.display = 'none';
     $('stage').innerHTML = `<div class="card"><div class="scene-text" style="text-align:center;">Cargando el Chavea Day…</div></div>`;
     try{
-      await cargarOcrearPerfil(user);
+      const perfil = await cargarOcrearPerfil(user);
       await cargarContenidoDelJuego();
+      miDex = perfil.chaveadex || {};
+      if(!perfil.chaveadex && (perfil.partidas||0) > 0) await reconstruirDexHistorica();
       showIntro();
     }catch(err){
       console.error(err);
@@ -344,7 +399,8 @@ function pickFair(pool, n){
   const elegidas = [];
   // sc.si() = condición de escena (p.ej. una escena de un Alberto solo puede
   // salir si ese Alberto ya ha aparecido antes en la partida)
-  const restantes = shuffle(pool).filter(sc => !sc.si || sc.si());
+  // sc.enc  = encuentro por lugar: jamás entra por sorteo (lo inserta checkEncuentros)
+  const restantes = shuffle(pool).filter(sc => !sc.enc && (!sc.si || sc.si()));
   // sc.prio = promesa narrativa pendiente (si el juego la ha anunciado, se paga)
   for(let i=restantes.length-1; i>=0 && elegidas.length<n; i--){
     if(restantes[i].prio){
@@ -368,6 +424,22 @@ function pickFair(pool, n){
 }
 
 let CH = {}, AMIGOS = [], ROSTER = [], PHASES = [];
+
+/* ================= CHAVEADEX: estado =================
+   DEX      = catálogo de fichas (viene de escenas/meta en Firestore).
+   miDex    = tu histórico (perfiles/<uid>.chaveadex): {id:{v, r, variantes?}}.
+   dexGame  = lo visto/registrado en la partida en curso (se fusiona al guardar).
+   VISTO (v)      = el personaje ha aparecido en alguna de tus partidas.
+   REGISTRADO (r) = has completado su escena legendaria o su condición de captura. */
+let DEX = [], DEXBYID = {}, CH2DEX = {};
+const TIERS = {
+  comun:{n:"LOS 7", c:"var(--green)"}, nocturno:{n:"NOCTURNO", c:"var(--blue)"},
+  raro:{n:"RARO", c:"var(--purple)"}, legendario:{n:"LEGENDARIO", c:"var(--gold)"}
+};
+let miDex = {};
+let dexGame = {};
+let novedadesDex = [];
+let encInsertadas = new Set(), encSplashed = new Set();
 /* El contenido narrativo (personajes, amigos de Pocho, y las 68 escenas) ya
    NO vive en este archivo público: se pide a Firestore, y solo lo puede leer
    quien haya iniciado sesión con un correo de la whitelist (ver reglas de
@@ -390,19 +462,158 @@ async function cargarContenidoDelJuego(){
   if(!metaSnap.exists()) throw new Error("Sin contenido en Firestore");
   const meta = metaSnap.data();
   CH = meta.CH; AMIGOS = meta.AMIGOS; ROSTER = meta.roster || [];
+  /* Catálogo de la Chaveadex: si aún no está subido, el juego funciona igual
+     (sin galería ni splashes), no se rompe nada. */
+  DEX = meta.dex || []; DEXBYID = {}; CH2DEX = {};
+  DEX.forEach(d=>{
+    DEXBYID[d.id] = d;
+    // los personajes con clave propia (los 7, Albertos, el amigo) registran
+    // avistamiento automático; los "cameo" comparten clave y van por escena.
+    if(d.ch && d.ch !== 'cameo') CH2DEX[d.ch] = d.id;
+  });
   const fases = [];
   for(const finfo of meta.phases){
     const fSnap = await getDoc(doc(db,"escenas",finfo.id));
     const fd = fSnap.data();
     activarCondiciones(fd.intro);
+    activarCondiciones(fd.cruce);
     activarCondiciones(fd.outro);
     (fd.pool||[]).forEach(activarCondiciones);
     fases.push({
       name:finfo.name, clock:finfo.clock, tag:finfo.tag, pick:finfo.pick, drift:finfo.drift||null,
-      intro:fd.intro, outro:fd.outro||null, pool:fd.pool
+      intro:fd.intro, cruce:fd.cruce||null, outro:fd.outro||null, pool:fd.pool
     });
   }
   PHASES = fases;
+}
+
+/* ================= CHAVEADEX: lógica ================= */
+function estadoDex(id){
+  const p = miDex[id]||{}, g = dexGame[id]||{};
+  return {
+    v: (p.v||0) + (g.v||0),
+    r: !!(p.r || g.r),
+    variantes: [...new Set([...(p.variantes||[]), ...(g.variantes||[])])]
+  };
+}
+function marcarVisto(id){
+  const d = DEXBYID[id]; if(!d) return null;
+  const antes = estadoDex(id);
+  const g = dexGame[id] || (dexGame[id] = {v:0, r:false});
+  g.v++;
+  // el amigo de Pocho tiene 7 formas: apuntamos cuál te ha tocado
+  if(id === 'amigo' && amigo){
+    const ix = AMIGOS.indexOf(amigo);
+    if(ix >= 0 && !antes.variantes.includes(ix)){
+      g.variantes = g.variantes || [];
+      if(!g.variantes.includes(ix)) g.variantes.push(ix);
+    }
+  }
+  if(antes.v === 0) novedadesDex.push({tipo:'visto', id});
+  return { nuevo: antes.v === 0, total: antes.v + 1 };
+}
+function marcarRegistrado(id){
+  const d = DEXBYID[id]; if(!d) return null;
+  const antes = estadoDex(id);
+  const g = dexGame[id] || (dexGame[id] = {v:0, r:false});
+  if(antes.v === 0 && g.v === 0){ g.v = 1; novedadesDex.push({tipo:'visto', id}); }
+  if(!antes.r) novedadesDex.push({tipo:'reg', id});
+  g.r = true;
+  return { nuevo: !antes.r };
+}
+/* Encuentros por lugar: las escenas enc:true NUNCA salen por sorteo.
+   Se insertan en la cola en cuanto su condición (estar en el sitio
+   correcto a la hora correcta) se cumple. Como en Pokémon: si no vas
+   a la hierba alta, no hay bicho. */
+function checkEncuentros(minPos){
+  const P = PHASES[phaseIdx]; if(!P) return;
+  let at = Math.max(sceneIdx, minPos||0);
+  for(const sc of (P.pool||[])){
+    if(sc.enc && !encInsertadas.has(sc) && (!sc.si || sc.si())){
+      encInsertadas.add(sc);
+      queue.splice(at++, 0, sc);
+    }
+  }
+}
+function splashEncuentro(sc){
+  const d = DEXBYID[sc.dex];
+  const res = marcarVisto(sc.dex);
+  const t = TIERS[d.tier] || TIERS.raro;
+  window._encScene = sc;
+  stage(`<div class="enc">
+    <div class="enc-pre">✨ ENCUENTRO ✨</div>
+    <div class="enc-avatar">${d.a}</div>
+    <h2>¡UN ${d.n.toUpperCase()} SALVAJE HA APARECIDO!</h2>
+    <div class="enc-tier" style="color:${t.c}">${t.n}</div><br>
+    ${res.nuevo
+      ? `<div class="enc-new">✨ NUEVO EN LA CHAVEADEX</div>`
+      : `<div class="enc-count">Encuentro nº ${res.total} con este personaje</div>`}
+    <div class="choices" style="margin-top:22px;"><button class="next" onclick="encContinuar()">▶ ¿Qué hace el aspirante?</button></div>
+  </div>`);
+}
+function encContinuar(){ renderScene(window._encScene); }
+/* Primera visita con la Chaveadex activa: reconstruye lo que se pueda
+   del histórico de días ya jugados (avistamientos por chavea y Manolo). */
+async function reconstruirDexHistorica(){
+  try{
+    const snap = await getDocs(collection(db,"perfiles",currentUser.uid,"dias"));
+    const acc = {};
+    snap.forEach(docu=>{
+      const dia = docu.data();
+      const cv = dia.chaveasVistos||{};
+      for(const ch in cv){
+        const id = CH2DEX[ch];
+        if(id){ const e = acc[id]||(acc[id]={v:0,r:false}); e.v += cv[ch]||0; }
+      }
+      const fl = dia.flags||{};
+      if(fl.manolo){ const e = acc.manolo||(acc.manolo={v:0,r:false}); e.v++; e.r=true; }
+    });
+    miDex = acc;
+    if(Object.keys(acc).length){
+      await setDoc(doc(db,"perfiles",currentUser.uid), {chaveadex: acc}, {merge:true});
+    }
+  }catch(err){ console.warn("No se pudo reconstruir la Chaveadex:", err); }
+}
+function chaveadex(){
+  $('hud').style.display='none';
+  if(!DEX.length){
+    stage(`<div class="scene-text" style="text-align:center;">📕 La Chaveadex todavía no está disponible: falta subir el catálogo a Firestore.</div>
+      <div class="choices"><button class="next" onclick="showIntro()">← Volver</button></div>`);
+    return;
+  }
+  let v=0, r=0;
+  DEX.forEach(d=>{ const e=estadoDex(d.id); if(e.v>0)v++; if(e.r)r++; });
+  const grupos = [['comun'],['nocturno'],['raro'],['legendario']];
+  let cuerpo = '';
+  for(const [tier] of grupos){
+    const items = DEX.map((d,i)=>({d,i})).filter(x=>x.d.tier===tier);
+    if(!items.length) continue;
+    const t = TIERS[tier];
+    cuerpo += `<div class="dex-tier-title" style="color:${t.c}">${t.n}</div><div class="dexgrid">`;
+    for(const {d,i} of items){
+      const e = estadoDex(d.id);
+      const num = `Nº ${String(i+1).padStart(3,'0')}`;
+      const formas = d.id==='amigo' ? ` · Formas: ${e.variantes.length}/${AMIGOS.length||7}` : '';
+      if(e.r){
+        cuerpo += `<div class="dex-cell reg"><span class="dex-num">${num}</span><span class="dex-a">${d.a}</span>
+          <b>${d.n}</b><span class="dex-chip">REGISTRADO ✓</span><p>${d.desc||''}</p>
+          <span class="dex-n">Encuentros: ${e.v}${formas}</span></div>`;
+      } else if(e.v > 0){
+        cuerpo += `<div class="dex-cell visto"><span class="dex-num">${num}</span><span class="dex-a">${d.a}</span>
+          <b>${d.n}</b><span class="dex-chip">SIN REGISTRAR</span><p>📍 ${d.captura||'Nadie sabe todavía cómo se registra.'}</p>
+          <span class="dex-n">Visto ${e.v} ${e.v===1?'vez':'veces'}${formas}</span></div>`;
+      } else {
+        cuerpo += `<div class="dex-cell locked"><span class="dex-num">${num}</span><span class="dex-a">${d.a}</span>
+          <b>???</b><span class="dex-chip">SIN AVISTAR</span><p>${d.pista||''}</p></div>`;
+      }
+    }
+    cuerpo += `</div>`;
+  }
+  stage(`<div class="dexhead"><h2>📕 LA CHAVEADEX</h2>
+    <div class="dexstats">Vistos ${v}/${DEX.length} · Registrados ${r}/${DEX.length}</div>
+    <div class="dexstats" style="font-style:italic;">Hay que verlos a todos. Hay que registrarlos a todos.</div></div>
+    ${cuerpo}
+    <div class="choices" style="margin-top:20px;"><button class="next" onclick="showIntro()">← Volver al principio</button></div>`);
 }
 
 
@@ -481,6 +692,13 @@ function checkKO(){
 /* ================= RENDER ================= */
 function stage(html){ $('stage').innerHTML = `<div class="card">${html}</div>`; window.scrollTo({top:0,behavior:'smooth'}); }
 
+function dexBtn(){
+  if(!DEX.length) return '';
+  let v=0, r=0;
+  DEX.forEach(d=>{ const e=estadoDex(d.id); if(e.v>0)v++; if(e.r)r++; });
+  return `<button class="choice" onclick="chaveadex()" style="text-align:center;">📕 CHAVEADEX — ${v}/${DEX.length} vistos · ${r}/${DEX.length} registrados</button>`;
+}
+
 function showIntro(){
   $('hud').style.display='none';
   const rosterHtml = ROSTER.map(m=>`<div class="r">${m.a} <b>${m.n}</b> — ${m.bio}</div>`).join('');
@@ -490,7 +708,7 @@ function showIntro(){
     <div class="roster">${rosterHtml}</div>
     <div class="scene-text">Reglas: vigila tu <b>alcohol</b> (si llega al máximo, K.O.), tu <b>dignidad</b> y tu <b>energía</b> (si llegan a cero, fin), y tu <b>dinero</b>. Gana <b style="color:var(--gold)">Respeto Chavea 👑</b> para ser aceptado al amanecer.</div>
     <div class="small">Los eventos son aleatorios: cada partida es un Chavea Day distinto.</div>
-    <div class="choices"><button class="next" onclick="startGame()">🍽️ SON LAS 14:00 — EMPIEZA EL CHAVEA DAY</button></div>
+    <div class="choices"><button class="next" onclick="startGame()">🍽️ SON LAS 14:00 — EMPIEZA EL CHAVEA DAY</button>${dexBtn()}</div>
   </div>`;
   pintarRanking('rankingIntro', 5);
 }
@@ -500,6 +718,8 @@ function startGame(){
   rescates = 0;
   amigo = rnd(AMIGOS);
   vistos = {}; flags = {};
+  dexGame = {}; novedadesDex = [];
+  encInsertadas = new Set(); encSplashed = new Set();
   phaseIdx=0; $('hud').style.display='block'; updateHUD();
   startPhase();
 }
@@ -516,9 +736,12 @@ function startPhase(){
 function montarFase(){
   const P = PHASES[phaseIdx];
   $('phasename').textContent = P.name; $('clock').textContent = P.clock;
-  queue = [P.intro, ...pickFair(P.pool, P.pick)];
+  queue = [P.intro, ...(P.cruce?[P.cruce]:[]), ...pickFair(P.pool, P.pick)];
   if(P.outro) queue.push(P.outro);
   sceneIdx = 0;
+  // banderas de fases anteriores pueden desbloquear encuentros de esta fase
+  // (se insertan después de la intro y la encrucijada, nunca antes)
+  checkEncuentros(1 + (P.cruce?1:0));
   stage(`<div class="phase-title"><div class="clock">${P.clock}</div><h2>${P.name}</h2><p>${P.tag}</p></div>
     <div class="choices"><button class="next" onclick="nextScene()">Adelante →</button></div>`);
 }
@@ -535,10 +758,24 @@ function nextScene(){
 }
 
 function renderScene(sc){
+  // Encuentro salvaje: los personajes con ficha no-común entran con su
+  // pantalla de encuentro estilo Pokémon antes de la escena.
+  if(sc.dex && DEXBYID[sc.dex] && DEXBYID[sc.dex].tier !== 'comun' && !encSplashed.has(sc)){
+    encSplashed.add(sc);
+    return splashEncuentro(sc);
+  }
+  // avistamiento automático de personajes con clave propia (los 7, Albertos, amigo)
+  if(!sc.dex && CH2DEX[sc.ch]) marcarVisto(CH2DEX[sc.ch]);
+  // algunas escenas legendarias REGISTRAN al personaje solo con vivirlas
+  let dexBadge = '';
+  if(sc.dexReg && DEXBYID[sc.dexReg]){
+    const r = marcarRegistrado(sc.dexReg);
+    if(r && r.nuevo) dexBadge = `<div style="text-align:center;"><span class="dex-badge">📕 ${DEXBYID[sc.dexReg].n} — REGISTRADO EN LA CHAVEADEX</span></div>`;
+  }
   const c = CH[sc.ch]||CH.grupo;
   const nombre = c.n;
   let html = `<div class="who"><span class="avatar">${c.a}</span><span class="name">${nombre}</span></div>
-    <div class="scene-text">${T(sc.text)}</div><div class="choices">`;
+    <div class="scene-text">${T(sc.text)}</div>${dexBadge}<div class="choices">`;
   sc.opts.forEach((o,i)=>{
     if(o.req && !o.req(S)) return;
     html += `<button class="choice" onclick="pick(${i})">${T(o.t)}</button>`;
@@ -552,6 +789,14 @@ function pick(i){
   const sc = window._scene, o = sc.opts[i];
   if(sc.set) sc.set.forEach(f=>flags[f]=true);   // la escena misma marca
   if(o.set)  o.set.forEach(f=>flags[f]=true);    // la decisión marca
+  // elegir el sitio correcto puede desbloquear un encuentro AHORA MISMO
+  checkEncuentros();
+  // algunas decisiones concretas son la "captura" de un personaje
+  let dexBadge = '';
+  if(o.dexReg && DEXBYID[o.dexReg]){
+    const r = marcarRegistrado(o.dexReg);
+    if(r && r.nuevo) dexBadge = `<div style="text-align:center;"><span class="dex-badge">📕 ${DEXBYID[o.dexReg].n} — REGISTRADO EN LA CHAVEADEX</span></div>`;
+  }
   const c = CH[sc.ch]||CH.grupo;
   let out, rollNote='';
   if(o.roll){
@@ -566,7 +811,7 @@ function pick(i){
   const fxHtml = applyFx(out.fx);
   const nombre = c.n;
   let html = `<div class="who"><span class="avatar">${c.a}</span><span class="name">${nombre}</span></div>
-    <div class="result-text">${T(out.r)}</div>${rollNote}${fxHtml}
+    <div class="result-text">${T(out.r)}</div>${rollNote}${fxHtml}${dexBadge}
     <div class="choices"><button class="next" onclick="nextScene()">Continuar →</button></div>`;
   stage(html);
 }
@@ -575,11 +820,25 @@ function pick(i){
 function showEnding(e, conRanking=true){
   $('hud').style.display='none';
   const rankingBlock = conRanking ? `<div class="ranking" id="rankingBox"><div class="loading">Cargando ranking…</div></div>` : '';
+  // resumen de la Chaveadex: qué has visto o registrado HOY por primera vez
+  let dexBlock = '';
+  if(conRanking && novedadesDex.length){
+    const regs = new Set(novedadesDex.filter(n=>n.tipo==='reg').map(n=>n.id));
+    const lineas = [];
+    novedadesDex.forEach(n=>{
+      const d = DEXBYID[n.id]; if(!d) return;
+      if(n.tipo==='reg') lineas.push(`📕 ${d.a} <b>${d.n}</b> — ¡REGISTRADO!`);
+      else if(!regs.has(n.id)) lineas.push(`👁️ ${d.a} <b>${d.n}</b> — visto por primera vez`);
+    });
+    if(lineas.length) dexBlock = `<div class="dexnews"><h3>📕 NOVEDADES EN TU CHAVEADEX</h3>${lineas.map(l=>`<div>${l}</div>`).join('')}</div>`;
+  }
   stage(`<div class="ending"><div class="medal">${e.icon}</div><h2>${e.title}</h2>
     <div class="scene-text">${e.text}</div>
+    ${dexBlock}
     ${rankingBlock}
     <div class="choices" style="margin-top:22px;">
       <button class="next" onclick="startGame()">🔁 Otro Chavea Day (revancha)</button>
+      ${DEX.length?`<button class="choice" onclick="chaveadex()">📕 Ver la Chaveadex</button>`:''}
       <button class="choice" onclick="showIntro()">← Volver al principio</button>
     </div></div>`);
   if(conRanking){
@@ -627,10 +886,13 @@ window.nextScene = nextScene;
 window.pick = pick;
 window.showIntro = showIntro;
 window.montarFase = montarFase;
+window.chaveadex = chaveadex;
+window.encContinuar = encContinuar;
 /* El arranque ya no es automático: lo dispara onAuthStateChanged
    (login con Google válido, o modo invitado) más arriba. */
 </script>
 </body>
 </html>
+
 
 
