@@ -104,13 +104,19 @@
     font-family:Verdana,sans-serif;}
   .ranking table{width:100%; border-collapse:collapse; font-family:Verdana,sans-serif; font-size:.78rem;}
   .ranking td{padding:7px 6px; border-bottom:1px solid var(--card2);}
-  .ranking td:first-child{width:26px; color:var(--muted);}
+  .ranking td:first-child{width:32px; color:var(--muted);}
   .ranking td:last-child{text-align:right; color:var(--gold); font-weight:bold;}
   .ranking tr.me{background:rgba(245,197,66,.12); border-radius:8px;}
   .ranking .rk-user{display:flex; align-items:center; gap:8px;}
   .ranking .rk-user img{width:22px; height:22px; border-radius:99px;}
   .ranking .loading{text-align:center; color:var(--muted); font-family:Verdana,sans-serif; font-size:.8rem; padding:10px;}
   .ranking .yourank{text-align:center; font-family:Verdana,sans-serif; font-size:.75rem; color:var(--muted); margin-top:10px;}
+  .ranking .yourank b{color:var(--gold);}
+  .ranking td.pos{text-align:center; font-size:.85rem;}
+  .ranking .rk-user span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  /* variante para la pantalla de inicio: va arriba del todo, sin línea superior */
+  .ranking.top{margin:0 0 20px; border-top:none; border-bottom:1px solid var(--border);
+    padding-top:0; padding-bottom:16px;}
 </style>
 </head>
 <body>
@@ -248,31 +254,42 @@ async function guardarResultadoPartida(finalInfo){
   }
 }
 
-async function pintarRanking(contenedorId){
+/* Pinta el ranking en cualquier contenedor: se usa en la pantalla de inicio
+   (top 5, para que haya pique nada más abrir) y al terminar una partida. */
+async function pintarRanking(contenedorId, topN = 5){
   const cont = $(contenedorId);
+  if(!cont) return;
   if(!currentUser){
     cont.innerHTML = `<div class="yourank">Entra con Google para aparecer en el ranking de chaveas.</div>`;
     return;
   }
   try{
-    const q = query(collection(db,"ranking"), orderBy("mejorResp","desc"), limit(10));
+    const q = query(collection(db,"ranking"), orderBy("mejorResp","desc"), limit(topN));
     const snap = await getDocs(q);
-    let filas = '', puesto = 0, tuPuesto = null, dentroDelTop = false;
+    let filas = '', puesto = 0, dentroDelTop = false;
     snap.forEach(d=>{
       puesto++;
       const r = d.data();
       const esTu = d.id === currentUser.uid;
-      if(esTu){ tuPuesto = puesto; dentroDelTop = true; }
-      filas += `<tr class="${esTu?'me':''}"><td>${puesto}</td>
-        <td class="rk-user">${r.foto?`<img src="${r.foto}">`:''}${r.nombre}</td>
+      if(esTu) dentroDelTop = true;
+      const marca = puesto===1?'🥇':puesto===2?'🥈':puesto===3?'🥉':puesto;
+      filas += `<tr class="${esTu?'me':''}"><td class="pos">${marca}</td>
+        <td class="rk-user">${r.foto?`<img src="${r.foto}" referrerpolicy="no-referrer">`:''}<span>${r.nombre}</span></td>
         <td>👑 ${r.mejorResp}</td></tr>`;
     });
-    let extra = '';
-    if(!dentroDelTop){
-      const misSnap = await getDoc(doc(db,"ranking",currentUser.uid));
-      if(misSnap.exists()) extra = `<div class="yourank">Tu mejor Respeto Chavea: 👑 ${misSnap.data().mejorResp} (fuera del top 10)</div>`;
+    if(!filas) filas = `<tr><td colspan="3" class="loading">Todavía no hay marcas. Sé el primero.</td></tr>`;
+
+    // Tu mejor marca sale siempre, estés o no en el top
+    let tuya = '';
+    const misSnap = await getDoc(doc(db,"ranking",currentUser.uid));
+    if(misSnap.exists()){
+      const m = misSnap.data();
+      const partidas = m.partidas||0;
+      tuya = `<div class="yourank">Tu mejor marca: <b>👑 ${m.mejorResp}</b> · ${partidas} ${partidas===1?'Chavea Day jugado':'Chavea Days jugados'}${dentroDelTop?'':` · fuera del top ${topN}`}</div>`;
+    } else {
+      tuya = `<div class="yourank">Todavía no has terminado ningún Chavea Day. Juega uno y entras en el ranking.</div>`;
     }
-    cont.innerHTML = `<h3>👑 RANKING DE CHAVEAS</h3><table>${filas}</table>${extra}`;
+    cont.innerHTML = `<h3>👑 RANKING DE CHAVEAS</h3><table>${filas}</table>${tuya}`;
   }catch(err){
     cont.innerHTML = `<div class="yourank">No se ha podido cargar el ranking ahora mismo.</div>`;
   }
@@ -468,12 +485,14 @@ function showIntro(){
   $('hud').style.display='none';
   const rosterHtml = ROSTER.map(m=>`<div class="r">${m.a} <b>${m.n}</b> — ${m.bio}</div>`).join('');
   $('stage').innerHTML = `<div class="card" id="intro">
+    <div class="ranking top" id="rankingIntro"><div class="loading">Cargando ranking…</div></div>
     <div class="scene-text">Hay un día sagrado al año. Comida, vino, cervezas, copas, chupitos y alguna que <i>«otra cosa»</i> más. Empieza a las dos de la tarde y termina cuando el cuerpo dice basta.\n\nSe llama <b style="color:var(--gold)">CHAVEA DAY</b>.\n\nHoy, por primera vez, has sido invitado. No como chavea. Como <b>aspirante</b>. Si al amanecer los chaveas te consideran digno, entrarás en el grupo. Si no... siempre te quedará el recuerdo.\n\nEstos son tus jueces:</div>
     <div class="roster">${rosterHtml}</div>
     <div class="scene-text">Reglas: vigila tu <b>alcohol</b> (si llega al máximo, K.O.), tu <b>dignidad</b> y tu <b>energía</b> (si llegan a cero, fin), y tu <b>dinero</b>. Gana <b style="color:var(--gold)">Respeto Chavea 👑</b> para ser aceptado al amanecer.</div>
     <div class="small">Los eventos son aleatorios: cada partida es un Chavea Day distinto.</div>
     <div class="choices"><button class="next" onclick="startGame()">🍽️ SON LAS 14:00 — EMPIEZA EL CHAVEA DAY</button></div>
   </div>`;
+  pintarRanking('rankingIntro', 5);
 }
 
 function startGame(){
@@ -564,7 +583,7 @@ function showEnding(e, conRanking=true){
       <button class="choice" onclick="showIntro()">← Volver al principio</button>
     </div></div>`);
   if(conRanking){
-    guardarResultadoPartida(e).finally(()=>pintarRanking('rankingBox'));
+    guardarResultadoPartida(e).finally(()=>pintarRanking('rankingBox', 5));
   }
 }
 
@@ -613,4 +632,5 @@ window.montarFase = montarFase;
 </script>
 </body>
 </html>
+
 
